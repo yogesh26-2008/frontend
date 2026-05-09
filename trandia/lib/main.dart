@@ -1,6 +1,7 @@
 import 'dart:async';
 
 import 'package:firebase_core/firebase_core.dart';
+import 'package:firebase_messaging/firebase_messaging.dart';
 import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 
@@ -11,6 +12,16 @@ import 'services/auth_service.dart';
 import 'services/api_service.dart';
 import 'services/fcm_service.dart';
 import 'utils/web_utils.dart';
+
+/// Background message handler — must be a top-level function.
+/// Called when a notification arrives while the app is terminated or in background.
+/// On Android this runs in a separate isolate — keep it minimal.
+@pragma('vm:entry-point')
+Future<void> _firebaseMessagingBackgroundHandler(RemoteMessage message) async {
+  // Firebase must be initialized even in background isolate
+  await Firebase.initializeApp(options: DefaultFirebaseOptions.currentPlatform);
+  debugPrint('[FCM] Background message: ${message.notification?.title}');
+}
 
 void main() async {
   WidgetsFlutterBinding.ensureInitialized();
@@ -25,11 +36,13 @@ void main() async {
     debugPrint('[Firebase] ❌ Init failed: $e');
   }
 
-  // Step 2: Pre-fetch FCM token NOW — before any login/signup happens.
-  // Cached in SharedPreferences so login/signup can read it instantly.
+  // Step 2: Register background message handler
+  FirebaseMessaging.onBackgroundMessage(_firebaseMessagingBackgroundHandler);
+
+  // Step 3: Create notification channel + fetch FCM token + setup foreground handler
   await FcmService.initAndCache();
 
-  // Step 3: Listen for future token refreshes
+  // Step 4: Listen for token refreshes
   FcmService.listenForTokenRefresh();
 
   FlutterError.onError = (FlutterErrorDetails details) {

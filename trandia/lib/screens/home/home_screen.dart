@@ -1,3 +1,4 @@
+import 'package:cached_network_image/cached_network_image.dart';
 import 'package:flutter/material.dart';
 import '../../services/auth_service.dart';
 import '../../services/api_service.dart';
@@ -18,9 +19,6 @@ class _HomeScreenState extends State<HomeScreen> {
   @override
   void initState() {
     super.initState();
-    // BUG FIX: HomeScreen was completely empty — it never fetched user data.
-    // The /users/me endpoint existed on the backend but was never called.
-    // Now we fetch the current user on mount and display their info.
     _fetchMe();
   }
 
@@ -34,8 +32,6 @@ class _HomeScreenState extends State<HomeScreen> {
       });
     } on ApiException catch (e) {
       if (!mounted) return;
-      // 401 is already handled in ApiService (token cleared).
-      // If we get here with a session-expired error, push to login.
       if (e.message.contains('Session expired')) {
         _pushToLogin();
         return;
@@ -127,10 +123,15 @@ class _HomeScreenState extends State<HomeScreen> {
         child: Column(
           mainAxisAlignment: MainAxisAlignment.center,
           children: [
+            // FIX: Replaced raw NetworkImage with CachedNetworkImageProvider.
+            // NetworkImage has no disk or memory cache — it re-fetches the image
+            // on every widget rebuild. CachedNetworkImage caches to memory + disk,
+            // eliminating redundant network calls and speeding up rendering.
             if (picture != null)
               CircleAvatar(
                 radius: 40,
-                backgroundImage: NetworkImage(picture),
+                backgroundImage: CachedNetworkImageProvider(picture),
+                onBackgroundImageError: (_, __) {},
               )
             else
               CircleAvatar(

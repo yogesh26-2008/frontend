@@ -17,6 +17,7 @@ dependencies:
   google_sign_in: ^6.2.2
   permission_handler: ^11.3.1
   web: ^1.1.0   # only used in web_utils_web.dart via conditional export — safe for Android
+  cached_network_image: ^3.4.1   # caches remote images in memory + disk — prevents re-fetching on every rebuild
 
 dev_dependencies:
   flutter_test:

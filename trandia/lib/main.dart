@@ -5,6 +5,7 @@ import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 import 'package:permission_handler/permission_handler.dart';
 
+import 'firebase_options.dart';
 import 'screens/auth/login_screen.dart';
 import 'screens/home/home_screen.dart';
 import 'services/auth_service.dart';
@@ -15,10 +16,11 @@ import 'utils/web_utils.dart';
 void main() async {
   WidgetsFlutterBinding.ensureInitialized();
 
-  // Initialize Firebase (required for FCM)
-  // google-services.json in android/app/ is picked up automatically
+  // Initialize Firebase using the generated firebase_options.dart
   try {
-    await Firebase.initializeApp();
+    await Firebase.initializeApp(
+      options: DefaultFirebaseOptions.currentPlatform,
+    );
     FcmService.listenForTokenRefresh();
   } catch (e) {
     debugPrint('[Firebase] Init failed (non-fatal): $e');

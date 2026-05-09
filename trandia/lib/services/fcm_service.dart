@@ -22,18 +22,15 @@ const AndroidNotificationChannel _androidChannel = AndroidNotificationChannel(
 );
 
 class FcmService {
-  /// Call ONCE in main() before runApp().
   static Future<void> initAndCache() async {
     if (kIsWeb) return;
     await _setupLocalNotifications();
-    await _requestPermissionAndFetchToken();
+    await _refreshToken(); // Always fetch fresh token — don't rely on stale cache
     _listenForeground();
   }
 
-  // ── Create Android channel + init local notifications ──────────────────
   static Future<void> _setupLocalNotifications() async {
     try {
-      // Create the Android notification channel (ignored if already exists)
       await _localNotif
           .resolvePlatformSpecificImplementation<
               AndroidFlutterLocalNotificationsPlugin>()
@@ -48,18 +45,18 @@ class FcmService {
       await _localNotif.initialize(
         const InitializationSettings(android: androidInit, iOS: iosInit),
       );
-      debugPrint('[FCM] ✅ Notification channel created: $_kChannelId');
+      debugPrint('[FCM] ✅ Notification channel ready: $_kChannelId');
     } catch (e) {
       debugPrint('[FCM] _setupLocalNotifications error: $e');
     }
   }
 
-  // ── Permission + token ─────────────────────────────────────────────────
-  static Future<void> _requestPermissionAndFetchToken() async {
+  /// Always fetches a fresh token from FCM and saves it.
+  /// FCM returns the same token if it hasn't changed — no extra cost.
+  static Future<void> _refreshToken() async {
     try {
       final messaging = FirebaseMessaging.instance;
 
-      // iOS: show notifications even when app is in foreground
       await messaging.setForegroundNotificationPresentationOptions(
         alert: true,
         badge: true,
@@ -77,26 +74,28 @@ class FcmService {
         return;
       }
 
+      // Delete stale token first — forces FCM to issue a fresh one
+      // This is critical after package name / app reinstall changes
+      await messaging.deleteToken();
       final token = await messaging.getToken();
+
       if (token != null && token.isNotEmpty) {
         final prefs = await SharedPreferences.getInstance();
         await prefs.setString(_kTokenKey, token);
-        debugPrint('[FCM] ✅ Token cached: ${token.substring(0, 25)}...');
+        debugPrint('[FCM] ✅ Fresh token cached: ${token.substring(0, 25)}...');
       } else {
-        debugPrint('[FCM] ⚠️ Token is null — check google-services.json');
+        debugPrint('[FCM] ⚠️ Token is null — check google-services.json package name');
       }
     } catch (e) {
-      debugPrint('[FCM] _requestPermissionAndFetchToken error: $e');
+      debugPrint('[FCM] _refreshToken error: $e');
     }
   }
 
-  // ── Foreground message handler ─────────────────────────────────────────
-  // FCM suppresses system notifications when app is open — show manually.
   static void _listenForeground() {
     FirebaseMessaging.onMessage.listen((RemoteMessage message) {
       final notification = message.notification;
       if (notification == null) return;
-      debugPrint('[FCM] Foreground message received: ${notification.title}');
+      debugPrint('[FCM] 📩 Foreground: ${notification.title}');
 
       _localNotif.show(
         notification.hashCode,
@@ -124,15 +123,13 @@ class FcmService {
     });
   }
 
-  // ── Public helpers ─────────────────────────────────────────────────────
-
   static Future<String?> getCachedToken() async {
     if (kIsWeb) return null;
     try {
       final prefs = await SharedPreferences.getInstance();
       final token = prefs.getString(_kTokenKey);
       debugPrint('[FCM] getCachedToken → '
-          '${token != null ? "${token.substring(0, 20)}..." : "null"}');
+          '${token != null ? "${token.substring(0, 20)}..." : "NULL ⚠️"}');
       return token;
     } catch (e) {
       debugPrint('[FCM] getCachedToken error: $e');
@@ -146,7 +143,7 @@ class FcmService {
       FirebaseMessaging.instance.onTokenRefresh.listen((newToken) async {
         final prefs = await SharedPreferences.getInstance();
         await prefs.setString(_kTokenKey, newToken);
-        debugPrint('[FCM] 🔄 Token refreshed');
+        debugPrint('[FCM] 🔄 Token refreshed and cached');
       });
     } catch (e) {
       debugPrint('[FCM] listenForTokenRefresh error: $e');

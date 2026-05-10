@@ -21,28 +21,28 @@ class _HomeScreenState extends State<HomeScreen> {
   void initState() {
     super.initState();
 
-    // BUG FIX #2 — Request Android 13+ POST_NOTIFICATIONS permission here,
-    // NOT in main() before runApp().
+    // ── FCM permission + token sync ────────────────────────────────────────
+    // This is the CORRECT place to request POST_NOTIFICATIONS permission:
+    //   (a) Activity is fully in RESUMED state — dialog shows properly
+    //   (b) Permission covers both FCM and local notifications (Android 13+)
+    //   (c) Token is synced with backend after permission is granted
     //
-    // Before runApp() the Android Activity has not yet reached its RESUMED
-    // state. On Android 13+ (API 33), the POST_NOTIFICATIONS permission dialog
-    // is shown via ActivityCompat.requestPermissions(), which requires a
-    // foreground Activity.  Calling it from main() caused the dialog to fail
-    // silently: it returned null without ever prompting the user, so local
-    // notifications were permanently denied on first install.
-    //
-    // HomeScreen.initState() is the first place where:
-    //  (a) the user has already seen a screen (so the request is contextual),
-    //  (b) the Activity is definitely in RESUMED state,
-    //  (c) the local-notification plugin is fully initialised (_initialized=true).
-    //
-    // startForegroundListener() below is now a no-op because main() already
-    // registered the onMessage listener.  We keep the call so the _listenerActive
-    // guard is exercised and the log line confirms the listener is alive.
-    FcmService.requestPermissionIfNeeded();
-    FcmService.startForegroundListener(); // no-op if already registered in main()
+    // Using addPostFrameCallback to ensure the first frame has rendered
+    // before showing the permission dialog — better UX.
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      _initNotifications();
+    });
+
+    FcmService.startForegroundListener(); // no-op if already registered
 
     _fetchMe();
+  }
+
+  Future<void> _initNotifications() async {
+    // Request permission + sync token — both FCM and local notifications
+    await FcmService.requestPermissionAndSyncToken();
+    // Backup: also request local notification permission explicitly
+    await FcmService.requestLocalPermissionIfNeeded();
   }
 
   Future<void> _fetchMe() async {

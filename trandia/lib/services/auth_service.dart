@@ -19,7 +19,6 @@ GoogleSignIn get _googleSignIn {
 class AuthService {
   static Future<Map<String, dynamic>> login(
       String email, String password) async {
-    // Use CACHED token — fast, no permission dialog during login
     final fcmToken = await FcmService.getCachedToken();
 
     final body = <String, dynamic>{
@@ -30,19 +29,20 @@ class AuthService {
 
     final data = await ApiService.post('/auth/login', body);
     await ApiService.saveToken(data['access_token'] as String);
-    
+
     final user = data['user'] as Map<String, dynamic>?;
     final firstName = user?['name']?.toString().split(' ').first ?? 'there';
-    
-    final granted = await FcmService.requestPermissionIfNeeded();
-    if (granted) {
-      await Future.delayed(const Duration(seconds: 1));
-      FcmService.showNotification(
-        title: "Welcome back, $firstName ✦", 
-        body: "Great to have you back. Your feed is right where you left it."
-      );
-    }
-    
+
+    // ── Show notification ALWAYS — do not gate on permission check ──────
+    // Permission is handled by HomeScreen after Activity is RESUMED.
+    // We fire-and-forget here — if permission not yet granted, Android
+    // will silently drop the notification (no crash). Once HomeScreen
+    // runs requestPermissionAndSyncToken(), future notifications work.
+    _showWelcomeNotification(
+      title: "Welcome back, $firstName ✦",
+      body: "Great to have you back. Your feed is right where you left it.",
+    );
+
     return data;
   }
 
@@ -52,7 +52,6 @@ class AuthService {
     required String email,
     required String password,
   }) async {
-    // Use CACHED token — fast, no permission dialog during signup
     final fcmToken = await FcmService.getCachedToken();
 
     final body = <String, dynamic>{
@@ -65,19 +64,27 @@ class AuthService {
 
     final data = await ApiService.post('/auth/signup', body);
     await ApiService.saveToken(data['access_token'] as String);
-    
+
     final firstName = name.split(' ').first;
-    
-    final granted = await FcmService.requestPermissionIfNeeded();
-    if (granted) {
-      await Future.delayed(const Duration(seconds: 1));
-      FcmService.showNotification(
-        title: "Welcome to Trandia ✦", 
-        body: "Hi $firstName, you're all set. Explore conversations and connect with people."
-      );
-    }
-    
+
+    _showWelcomeNotification(
+      title: "Welcome to Trandia ✦",
+      body: "Hi $firstName, you're all set. Explore conversations and connect with people.",
+    );
+
     return data;
+  }
+
+  // ── Fire-and-forget welcome notification ─────────────────────────────────
+  // Delay 1.5s so the user sees the HomeScreen before the notification
+  // pops up. No await — login/signup returns immediately.
+  static void _showWelcomeNotification({
+    required String title,
+    required String body,
+  }) {
+    Future.delayed(const Duration(milliseconds: 1500), () {
+      FcmService.showNotification(title: title, body: body);
+    });
   }
 
   static Future<Map<String, dynamic>?> loginWithGoogle() async {
@@ -98,7 +105,6 @@ class AuthService {
       throw const ApiException('Could not get Google ID token from device.');
     }
 
-    // Use CACHED token
     final fcmToken = await FcmService.getCachedToken();
 
     final body = <String, dynamic>{'id_token': idToken};
@@ -106,19 +112,15 @@ class AuthService {
 
     final data = await ApiService.post('/auth/google/verify', body);
     await ApiService.saveToken(data['access_token'] as String);
-    
+
     final user = data['user'] as Map<String, dynamic>?;
     final firstName = user?['name']?.toString().split(' ').first ?? 'there';
-    
-    final granted = await FcmService.requestPermissionIfNeeded();
-    if (granted) {
-      await Future.delayed(const Duration(seconds: 1));
-      FcmService.showNotification(
-        title: "Welcome to Trandia ✦", 
-        body: "Hi $firstName, you're all set. Explore conversations and connect with people."
-      );
-    }
-    
+
+    _showWelcomeNotification(
+      title: "Welcome to Trandia ✦",
+      body: "Hi $firstName, you're all set. Explore conversations and connect with people.",
+    );
+
     return data;
   }
 

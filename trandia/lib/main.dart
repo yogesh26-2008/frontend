@@ -13,22 +13,19 @@ import 'services/api_service.dart';
 import 'services/fcm_service.dart';
 import 'utils/web_utils.dart';
 
-/// MUST be top-level. Runs in a separate isolate when app is terminated/background.
+/// Background handler — must be top-level.
 @pragma('vm:entry-point')
 Future<void> _bgHandler(RemoteMessage message) async {
   await Firebase.initializeApp(options: DefaultFirebaseOptions.currentPlatform);
   debugPrint('[FCM] Background message: ${message.notification?.title}');
-  // Android auto-shows notification when app is background/terminated
-  // because the message has a notification payload — no manual show needed.
 }
 
-// ── Global navigator key ──────────────────────────────────────────────────
 final GlobalKey<NavigatorState> navigatorKey = GlobalKey<NavigatorState>();
 
 void main() async {
   WidgetsFlutterBinding.ensureInitialized();
 
-  // 1. Firebase
+  // 1. Firebase init
   try {
     await Firebase.initializeApp(
         options: DefaultFirebaseOptions.currentPlatform);
@@ -37,62 +34,38 @@ void main() async {
     debugPrint('[Firebase] ❌ $e');
   }
 
-  // 2. Background message handler (must be registered before runApp)
+  // 2. Background message handler (must be before runApp)
   FirebaseMessaging.onBackgroundMessage(_bgHandler);
 
-  // 3. Init local notifications channel + fetch FCM token.
-  //    Note: Android 13+ POST_NOTIFICATIONS permission is intentionally NOT
-  //    requested here. Before runApp() the Activity is not yet in its RESUMED
-  //    state, so the permission dialog silently fails on Android 13+.  The
-  //    permission is requested from HomeScreen.initState() instead via
-  //    FcmService.requestPermissionIfNeeded().
+  // 3. Init local notifications plugin + channel ONLY.
+  //    NO permission request here — Android 13+ needs Activity RESUMED state.
+  //    Permission is requested from HomeScreen via requestPermissionAndSyncToken().
   await FcmService.initAndCache();
 
-  // 4. BUG FIX #3 — Register onMessage listener HERE in main(), not only in
-  //    HomeScreen.initState().
-  //
-  //    Root cause of "notification sent but not received on device":
-  //    The backend sends the FCM message 3 seconds after login/signup.
-  //    Navigation from LoginScreen → HomeScreen can take 300–800 ms on
-  //    mid-range devices.  In the gap between the API response returning and
-  //    HomeScreen.initState() completing, onMessage had no subscriber.
-  //    If the message arrived in that window (possible if Railway was warm and
-  //    the 3s delay was shorter than the round-trip), it was silently dropped.
-  //
-  //    Registering here means the listener is active from the first frame.
-  //    The _listenerActive guard in startForegroundListener() prevents double-
-  //    registration if HomeScreen also calls the method (it becomes a no-op).
+  // 4. Register foreground message listener BEFORE runApp so no messages
+  //    are missed during the login → HomeScreen navigation transition.
   FcmService.startForegroundListener();
 
   // 5. Token refresh listener
   FcmService.listenForTokenRefresh();
 
-  // 6. Handle notification tap when app was in BACKGROUND (not terminated).
+  // 6. Background tap handler
   FirebaseMessaging.onMessageOpenedApp.listen(_handleNotificationTap);
 
   FlutterError.onError = (d) => FlutterError.presentError(d);
 
   runZonedGuarded(
-    () => runApp(MyApp()),
+    () => runApp(const MyApp()),
     (e, st) => debugPrint('[UNCAUGHT] $e\n$st'),
   );
 }
 
-/// Handles a notification tap regardless of whether the app was in
-/// background (onMessageOpenedApp) or terminated (getInitialMessage).
 void _handleNotificationTap(RemoteMessage message) {
   debugPrint('[FCM] Notification tapped: ${message.data}');
-  final type = message.data['type'] as String?;
-  switch (type) {
-    case 'welcome':
-    // Already on HomeScreen — nothing extra to do.
-    default:
-      break;
-  }
 }
 
 class MyApp extends StatefulWidget {
-  MyApp({super.key});
+  const MyApp({super.key});
 
   @override
   State<MyApp> createState() => _MyAppState();
@@ -102,7 +75,6 @@ class _MyAppState extends State<MyApp> {
   @override
   void initState() {
     super.initState();
-    // Handle notification tap from TERMINATED state.
     _checkInitialMessage();
   }
 
@@ -110,7 +82,7 @@ class _MyAppState extends State<MyApp> {
     final RemoteMessage? initial =
         await FirebaseMessaging.instance.getInitialMessage();
     if (initial != null) {
-      debugPrint('[FCM] App opened from terminated via notification: ${initial.data}');
+      debugPrint('[FCM] App opened from terminated: ${initial.data}');
       _handleNotificationTap(initial);
     }
   }
@@ -142,7 +114,6 @@ class _SplashRouterState extends State<_SplashRouter> {
   }
 
   Future<void> _route() async {
-    // Web Google OAuth redirect
     final params = getUrlSearchParams();
     if (params.containsKey('token')) {
       await ApiService.saveToken(params['token']!);

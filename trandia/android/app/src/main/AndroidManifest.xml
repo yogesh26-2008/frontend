@@ -5,9 +5,9 @@
     <uses-permission android:name="android.permission.VIBRATE"/>
 
     <application
-        android:label="trandia"
+        android:label="Trandia"
         android:name="${applicationName}"
-        android:icon="@mipmap/ic_launcher"
+        android:icon="@mipmap/launcher_icon"
         android:usesCleartextTraffic="false">
 
         <!-- Default FCM notification channel — used when app is in background -->

@@ -92,8 +92,8 @@ class FcmService {
   // before runApp() caused the dialog to silently fail on Android 13+,
   // leaving local-notification permission permanently denied and preventing
   // foreground notification display.
-  static Future<void> requestPermissionIfNeeded() async {
-    if (kIsWeb) return;
+  static Future<bool> requestPermissionIfNeeded() async {
+    if (kIsWeb) return false;
     try {
       final androidPlugin = flutterLocalNotificationsPlugin
           .resolvePlatformSpecificImplementation<
@@ -102,9 +102,12 @@ class FcmService {
         final bool? granted =
             await androidPlugin.requestNotificationsPermission();
         debugPrint('[FCM] Android 13+ local notification permission: $granted');
+        return granted ?? true;
       }
+      return true; // Not Android
     } catch (e) {
       debugPrint('[FCM] requestPermissionIfNeeded error: $e');
+      return false;
     }
   }
 

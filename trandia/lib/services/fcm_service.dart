@@ -190,8 +190,9 @@ class FcmService {
   static Future<void> showNotification({
     required String title,
     required String body,
-    int id = 42,
+    int? id,
   }) async {
+    id ??= DateTime.now().millisecondsSinceEpoch % 100000;
     // Re-init if needed (defensive)
     if (!_initialized) {
       debugPrint('[FCM] Not initialized — re-initializing...');

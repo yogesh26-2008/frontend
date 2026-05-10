@@ -1,4 +1,5 @@
 import 'dart:async';
+import 'dart:ui' show Color;
 import 'package:firebase_messaging/firebase_messaging.dart';
 import 'package:flutter/foundation.dart';
 import 'package:flutter_local_notifications/flutter_local_notifications.dart';
@@ -29,8 +30,6 @@ class FcmService {
   static Future<void> initAndCache() async {
     if (kIsWeb) return;
     await _initLocalNotifications();
-    // Get token WITHOUT requesting permission here.
-    // Permission is requested after Activity is RESUMED.
     await _fetchTokenSilently();
   }
 
@@ -60,19 +59,19 @@ class FcmService {
               AndroidFlutterLocalNotificationsPlugin>();
 
       if (androidPlugin != null) {
-        // ── Delete old channel first then recreate ──────────────────────
-        // Android caches channel settings permanently once created.
-        // Deleting first ensures Importance.high is always applied fresh.
+        // Delete old channel first so Android applies fresh Importance.max.
+        // Android permanently caches channel settings once created —
+        // deleting ensures heads-up banners work correctly.
         try {
           await androidPlugin.deleteNotificationChannel(_kChannelId);
-          debugPrint('[FCM] 🗑️ Old channel deleted');
+          debugPrint('[FCM] Old channel deleted');
         } catch (_) {}
 
         const channel = AndroidNotificationChannel(
           _kChannelId,
           _kChannelName,
           description: _kChannelDesc,
-          importance: Importance.max,   // max = heads-up banner on screen
+          importance: Importance.max,
           playSound: true,
           enableVibration: true,
           enableLights: true,
@@ -80,16 +79,14 @@ class FcmService {
         );
 
         await androidPlugin.createNotificationChannel(channel);
-        debugPrint('[FCM] ✅ Channel created: $_kChannelId with Importance.max');
+        debugPrint('[FCM] ✅ Channel created: $_kChannelId Importance.max');
       }
     } catch (e, st) {
       debugPrint('[FCM] ❌ _initLocalNotifications: $e\n$st');
     }
   }
 
-  // ── Silent token fetch (no permission request) ───────────────────────────
-  // Only reads the cached token from SharedPreferences.
-  // Token is refreshed properly by requestPermissionAndSyncToken().
+  // ── Silent token read from cache (no permission request) ─────────────────
   static Future<void> _fetchTokenSilently() async {
     try {
       final prefs = await SharedPreferences.getInstance();
@@ -101,48 +98,45 @@ class FcmService {
   }
 
   // ── MAIN permission + token sync ─────────────────────────────────────────
-  // Call from HomeScreen.initState() — this is the ONLY place that requests
-  // POST_NOTIFICATIONS permission, because:
-  //   (a) Activity is definitely in RESUMED state
-  //   (b) User has already seen the UI, so the request is contextual
-  //   (c) Both FCM + local notifications use the same POST_NOTIFICATIONS
-  //       permission on Android 13+, so requesting once is enough
+  // Call from HomeScreen.initState() via addPostFrameCallback.
+  // Activity is fully RESUMED here — dialog shows correctly on Android 13+.
   static Future<void> requestPermissionAndSyncToken() async {
     if (kIsWeb) return;
     try {
-      // 1. Request FCM permission (this is the authoritative permission request)
       final msg = FirebaseMessaging.instance;
+
+      // Request FCM permission (covers POST_NOTIFICATIONS on Android 13+)
       final settings = await msg.requestPermission(
         alert: true, badge: true, sound: true, provisional: false,
       );
       debugPrint('[FCM] FCM Permission: ${settings.authorizationStatus}');
 
-      // 2. iOS foreground display
+      // iOS foreground display options
       await msg.setForegroundNotificationPresentationOptions(
         alert: true, badge: true, sound: true,
       );
 
       if (settings.authorizationStatus == AuthorizationStatus.denied) {
-        debugPrint('[FCM] ❌ FCM permission denied');
+        debugPrint('[FCM] ❌ FCM permission denied by user');
         return;
       }
 
-      // 3. Get token
+      // Get FCM token
       final token = await msg.getToken();
       if (token == null || token.isEmpty) {
-        debugPrint('[FCM] ⚠️ Token null');
+        debugPrint('[FCM] ⚠️ Token is null');
         return;
       }
       debugPrint('[FCM] ✅ Token: ${token.substring(0, 20)}...');
 
-      // 4. Cache token
+      // Cache token
       final prefs = await SharedPreferences.getInstance();
       final old   = prefs.getString(_kTokenKey);
       await prefs.setString(_kTokenKey, token);
 
-      // 5. Sync with backend if token changed
+      // Sync with backend only if token changed
       if (old != token) {
-        debugPrint('[FCM] 🔄 Token changed — syncing with backend');
+        debugPrint('[FCM] Token changed — syncing with backend');
         await _syncToken(token, prefs);
       }
     } catch (e, st) {
@@ -150,10 +144,7 @@ class FcmService {
     }
   }
 
-  // ── Android 13+ local notification permission (separate check) ───────────
-  // This is a BACKUP check. FCM permission above covers both FCM and local
-  // notifications on Android 13+. This method ensures the local plugin also
-  // has access before showing in-app notifications.
+  // ── Android 13+ local notification permission (backup check) ────────────
   static Future<bool> requestLocalPermissionIfNeeded() async {
     if (kIsWeb) return false;
     try {
@@ -169,7 +160,7 @@ class FcmService {
       return true;
     } catch (e) {
       debugPrint('[FCM] requestLocalPermissionIfNeeded error: $e');
-      return true; // Assume granted on error, let show() handle failure
+      return true;
     }
   }
 
@@ -182,12 +173,10 @@ class FcmService {
     _listenerActive = true;
 
     FirebaseMessaging.onMessage.listen((RemoteMessage msg) async {
-      debugPrint('[FCM] 📩 onMessage received!');
-      debugPrint('[FCM]    notification: ${msg.notification?.title}');
-      debugPrint('[FCM]    data: ${msg.data}');
+      debugPrint('[FCM] 📩 onMessage: ${msg.notification?.title}');
 
       if (msg.data['type'] == 'welcome') {
-        debugPrint('[FCM] 🛡️ Ignoring backend welcome push (shown locally).');
+        debugPrint('[FCM] Ignoring backend welcome push (shown locally).');
         return;
       }
 
@@ -212,13 +201,12 @@ class FcmService {
   }) async {
     id ??= DateTime.now().millisecondsSinceEpoch % 100000;
 
-    // Ensure initialized
     if (!_initialized) {
       debugPrint('[FCM] Not initialized — re-initializing...');
       await _initLocalNotifications();
     }
 
-    debugPrint('[FCM] 🔔 Showing notification: "$title"');
+    debugPrint('[FCM] 🔔 Showing: "$title"');
 
     try {
       await flutterLocalNotificationsPlugin.show(
@@ -247,7 +235,7 @@ class FcmService {
           ),
         ),
       );
-      debugPrint('[FCM] ✅ Notification displayed successfully');
+      debugPrint('[FCM] ✅ Notification displayed');
     } catch (e, st) {
       debugPrint('[FCM] ❌ show() failed: $e\n$st');
     }
@@ -283,11 +271,11 @@ class FcmService {
     }
   }
 
-  // ── Get cached token ─────────────────────────────────────────────────────
+  // ── Get cached token (used during login/signup) ──────────────────────────
   static Future<String?> getCachedToken() async {
     if (kIsWeb) return null;
     try {
-      // Always try to get fresh token first
+      // Try fresh token first
       final fresh = await FirebaseMessaging.instance.getToken();
       if (fresh != null && fresh.isNotEmpty) {
         final prefs = await SharedPreferences.getInstance();
@@ -296,7 +284,7 @@ class FcmService {
         return fresh;
       }
     } catch (_) {}
-    // Fallback to SharedPreferences cache
+    // Fallback to cache
     try {
       final prefs = await SharedPreferences.getInstance();
       final t = prefs.getString(_kTokenKey);

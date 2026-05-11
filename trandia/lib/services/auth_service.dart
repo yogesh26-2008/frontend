@@ -20,35 +20,24 @@ class AuthService {
 
   // ── Firebase Email Verification Signup ─────────────────────────────────────
 
-  /// Step 1: Create Firebase user + send verification email.
-  /// Returns the Firebase User object.
-  /// Throws [FirebaseAuthException] or [ApiException] on failure.
   static Future<User> initiateFirebaseSignup({
     required String email,
     required String password,
   }) async {
-    // Create Firebase user (temporary — for email verification only)
     final credential = await FirebaseAuth.instance
         .createUserWithEmailAndPassword(email: email, password: password);
-
     final user = credential.user!;
-
-    // Send verification email via Firebase (completely free, no service needed)
     await user.sendEmailVerification();
-
     return user;
   }
 
-  /// Step 2: Check if Firebase email is verified.
-  /// Call this when user presses "I've Verified" button.
   static Future<bool> checkEmailVerified() async {
     final user = FirebaseAuth.instance.currentUser;
     if (user == null) return false;
-    await user.reload(); // Refresh from Firebase server
+    await user.reload();
     return FirebaseAuth.instance.currentUser?.emailVerified ?? false;
   }
 
-  /// Step 3: Complete signup — get Firebase token + call our backend.
   static Future<Map<String, dynamic>> completeSignup({
     required String name,
     required String username,
@@ -60,11 +49,16 @@ class AuthService {
     }
 
     if (!firebaseUser.emailVerified) {
-      throw const ApiException('Email not verified yet. Please check your inbox.');
+      throw const ApiException(
+          'Email not verified yet. Please check your inbox.');
     }
 
-    // Get Firebase ID token (contains email_verified: true)
-    final idToken = await firebaseUser.getIdToken();
+    // Force refresh the token to get latest emailVerified status
+    final idToken = await firebaseUser.getIdToken(true);
+    if (idToken == null || idToken.isEmpty) {
+      throw const ApiException('Could not get auth token. Please try again.');
+    }
+
     final fcmToken = await FcmService.getCachedToken();
 
     final body = <String, dynamic>{
@@ -79,7 +73,7 @@ class AuthService {
     await ApiService.saveToken(data['access_token'] as String);
 
     // Sign out from Firebase — our app uses its own JWT
-    await FirebaseAuth.instance.signOut();
+    try { await FirebaseAuth.instance.signOut(); } catch (_) {}
 
     final firstName = name.split(' ').first;
     FcmService.queueWelcome(
@@ -90,7 +84,6 @@ class AuthService {
     return data;
   }
 
-  /// Resend verification email
   static Future<void> resendVerificationEmail() async {
     final user = FirebaseAuth.instance.currentUser;
     if (user == null) throw const ApiException('Session expired. Please signup again.');

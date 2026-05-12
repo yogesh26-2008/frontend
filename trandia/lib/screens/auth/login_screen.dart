@@ -1,12 +1,14 @@
 // lib/screens/auth/login_screen.dart
 //
-// Glass login — single file. Same auth logic as before; UI restyled with a
-// frosted-glass (liquid glass) system that adapts to light/dark via
-// Theme.of(context).brightness. Black/white shades only (no color accents),
-// except the Google logo which keeps its brand colors.
+// Glass login — single file. Same auth logic as before.
+// • Auto theme: follows the device system brightness (light/dark)
+// • Pixel-clean: backdrop fills the entire screen incl. behind the
+//   system gesture bar — no white strip at the bottom
+// • Black/white shades only (Google glyph keeps its brand colors)
 
 import 'dart:ui' as ui;
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
 import 'signup_screen.dart';
 import '../home/home_screen.dart';
 import '../../services/auth_service.dart';
@@ -40,14 +42,12 @@ class _LoginScreenState extends State<LoginScreen> {
   }
 
   Future<void> _handleSignIn() async {
-    final email    = _emailController.text.trim();
+    final email = _emailController.text.trim();
     final password = _passwordController.text;
-
     if (email.isEmpty || password.isEmpty) {
       _showError('Please fill in all fields');
       return;
     }
-
     setState(() => _isLoading = true);
     try {
       await AuthService.login(email, password);
@@ -70,8 +70,6 @@ class _LoginScreenState extends State<LoginScreen> {
     setState(() => _isLoading = true);
     try {
       final result = await AuthService.loginWithGoogle();
-      // On web, result == null because the browser is redirecting away to
-      // Google. The token is picked up in main.dart when it comes back.
       if (result == null) return;
       if (!mounted) return;
       Navigator.pushAndRemoveUntil(
@@ -90,183 +88,203 @@ class _LoginScreenState extends State<LoginScreen> {
 
   @override
   Widget build(BuildContext context) {
+    // Follow the app-level Theme which listens to system brightness
     final isDark = Theme.of(context).brightness == Brightness.dark;
     final t = _GlassTheme.of(isDark);
 
+    // Tint the system bars so the status bar icons stay readable.
+    SystemChrome.setSystemUIOverlayStyle(SystemUiOverlayStyle(
+      statusBarColor: Colors.transparent,
+      statusBarIconBrightness: isDark ? Brightness.light : Brightness.dark,
+      statusBarBrightness: isDark ? Brightness.dark : Brightness.light,
+      systemNavigationBarColor: t.bgStops.last,
+      systemNavigationBarIconBrightness:
+          isDark ? Brightness.light : Brightness.dark,
+    ));
+
+    final media = MediaQuery.of(context);
+
     return Scaffold(
+      // Critical: background colour matches backdrop base so there is no
+      // light strip behind the nav bar / when keyboard opens.
+      backgroundColor: t.bgStops.last,
       resizeToAvoidBottomInset: true,
-      body: Stack(
-        children: [
-          // ── Backdrop: base gradient + soft mono orbs ───────────────
-          Positioned.fill(child: _Backdrop(t: t)),
+      extendBody: true,
+      extendBodyBehindAppBar: true,
+      body: SizedBox.expand(
+        child: Stack(
+          fit: StackFit.expand,
+          children: [
+            // ── Backdrop: full screen including behind status & nav ────
+            Positioned.fill(child: _Backdrop(t: t)),
 
-          // ── Decorative floating glass chips (depth) ────────────────
-          Positioned(
-            top: 60, right: -30,
-            child: Transform.rotate(
-              angle: 0.31,
-              child: _GlassChip(t: t, size: 130, radius: 36),
+            // ── Decorative glass chips ─────────────────────────────────
+            Positioned(
+              top: 60 + media.padding.top,
+              right: -30,
+              child: Transform.rotate(
+                angle: 0.31,
+                child: _GlassChip(t: t, size: 130, radius: 36),
+              ),
             ),
-          ),
-          Positioned(
-            top: 210, left: -40,
-            child: Transform.rotate(
-              angle: -0.24,
-              child: _GlassChip(t: t, size: 90, radius: 26),
+            Positioned(
+              top: 210 + media.padding.top,
+              left: -40,
+              child: Transform.rotate(
+                angle: -0.24,
+                child: _GlassChip(t: t, size: 90, radius: 26),
+              ),
             ),
-          ),
 
-          // ── Main glass card ────────────────────────────────────────
-          SafeArea(
-            child: Padding(
-              padding: const EdgeInsets.fromLTRB(16, 24, 16, 16),
-              child: SingleChildScrollView(
-                child: _GlassCard(
-                  t: t,
-                  child: Padding(
-                    padding: const EdgeInsets.fromLTRB(22, 28, 22, 24),
-                    child: Column(
-                      crossAxisAlignment: CrossAxisAlignment.stretch,
-                      children: [
-                        // App mark
-                        Center(
-                          child: _GlassMark(t: t),
-                        ),
-                        const SizedBox(height: 18),
-
-                        // Heading
-                        Center(
-                          child: Text(
-                            'Welcome back',
-                            style: TextStyle(
-                              fontSize: 28,
-                              fontWeight: FontWeight.w700,
-                              letterSpacing: -0.5,
-                              color: t.fg,
-                            ),
-                          ),
-                        ),
-                        const SizedBox(height: 6),
-                        Center(
-                          child: Text(
-                            'Sign in to continue',
-                            style: TextStyle(fontSize: 14, color: t.muted),
-                          ),
-                        ),
-                        const SizedBox(height: 22),
-
-                        // Email
-                        _FieldLabel(label: 'Email', color: t.muted),
-                        const SizedBox(height: 8),
-                        _GlassField(
-                          t: t,
-                          controller: _emailController,
-                          hint: 'you@example.com',
-                          prefixIcon: Icons.mail_outline_rounded,
-                          keyboardType: TextInputType.emailAddress,
-                          textInputAction: TextInputAction.next,
-                        ),
-                        const SizedBox(height: 14),
-
-                        // Password
-                        _FieldLabel(label: 'Password', color: t.muted),
-                        const SizedBox(height: 8),
-                        _GlassField(
-                          t: t,
-                          controller: _passwordController,
-                          hint: 'Enter your password',
-                          prefixIcon: Icons.lock_outline_rounded,
-                          obscureText: _obscurePassword,
-                          textInputAction: TextInputAction.done,
-                          suffixIcon: _obscurePassword
-                              ? Icons.visibility_off_outlined
-                              : Icons.visibility_outlined,
-                          onSuffixTap: () => setState(
-                              () => _obscurePassword = !_obscurePassword),
-                        ),
-                        const SizedBox(height: 10),
-
-                        // Forgot password
-                        Align(
-                          alignment: Alignment.centerRight,
-                          child: GestureDetector(
-                            onTap: () { /* TODO: forgot password */ },
-                            behavior: HitTestBehavior.opaque,
-                            child: Padding(
-                              padding: const EdgeInsets.symmetric(vertical: 4),
+            // ── Card ───────────────────────────────────────────────────
+            SafeArea(
+              minimum: const EdgeInsets.symmetric(horizontal: 16, vertical: 16),
+              child: Center(
+                child: SingleChildScrollView(
+                  physics: const ClampingScrollPhysics(),
+                  child: ConstrainedBox(
+                    constraints: const BoxConstraints(maxWidth: 460),
+                    child: _GlassCard(
+                      t: t,
+                      child: Padding(
+                        padding:
+                            const EdgeInsets.fromLTRB(22, 28, 22, 24),
+                        child: Column(
+                          mainAxisSize: MainAxisSize.min,
+                          crossAxisAlignment: CrossAxisAlignment.stretch,
+                          children: [
+                            Center(child: _GlassMark(t: t)),
+                            const SizedBox(height: 18),
+                            Center(
                               child: Text(
-                                'Forgot password?',
+                                'Welcome back',
                                 style: TextStyle(
-                                  fontSize: 13,
-                                  fontWeight: FontWeight.w600,
+                                  fontSize: 28,
+                                  fontWeight: FontWeight.w700,
+                                  letterSpacing: -0.5,
                                   color: t.fg,
                                 ),
                               ),
                             ),
-                          ),
-                        ),
-                        const SizedBox(height: 14),
-
-                        // Sign in button (pill)
-                        _PrimaryPillButton(
-                          t: t,
-                          label: _isLoading ? 'Signing in…' : 'Sign in',
-                          onTap: _isLoading ? null : _handleSignIn,
-                        ),
-                        const SizedBox(height: 18),
-
-                        // OR divider
-                        _OrDivider(t: t),
-                        const SizedBox(height: 18),
-
-                        // Continue with Google (glass pill, colored G logo)
-                        _GooglePillButton(
-                          t: t,
-                          onTap: _isLoading ? null : _handleGoogleSignIn,
-                        ),
-                        const SizedBox(height: 22),
-
-                        // Sign up link
-                        Center(
-                          child: GestureDetector(
-                            onTap: _isLoading
-                                ? null
-                                : () => Navigator.push(
-                                      context,
-                                      MaterialPageRoute(
-                                        builder: (_) => const SignUpScreen(),
-                                      ),
+                            const SizedBox(height: 6),
+                            Center(
+                              child: Text(
+                                'Sign in to continue',
+                                style: TextStyle(
+                                    fontSize: 14, color: t.muted),
+                              ),
+                            ),
+                            const SizedBox(height: 22),
+                            _FieldLabel(label: 'Email', color: t.muted),
+                            const SizedBox(height: 8),
+                            _GlassField(
+                              t: t,
+                              controller: _emailController,
+                              hint: 'you@example.com',
+                              prefixIcon: Icons.mail_outline_rounded,
+                              keyboardType: TextInputType.emailAddress,
+                              textInputAction: TextInputAction.next,
+                            ),
+                            const SizedBox(height: 14),
+                            _FieldLabel(label: 'Password', color: t.muted),
+                            const SizedBox(height: 8),
+                            _GlassField(
+                              t: t,
+                              controller: _passwordController,
+                              hint: 'Enter your password',
+                              prefixIcon: Icons.lock_outline_rounded,
+                              obscureText: _obscurePassword,
+                              textInputAction: TextInputAction.done,
+                              suffixIcon: _obscurePassword
+                                  ? Icons.visibility_off_outlined
+                                  : Icons.visibility_outlined,
+                              onSuffixTap: () => setState(() =>
+                                  _obscurePassword = !_obscurePassword),
+                            ),
+                            const SizedBox(height: 10),
+                            Align(
+                              alignment: Alignment.centerRight,
+                              child: GestureDetector(
+                                onTap: () {/* TODO: forgot password */},
+                                behavior: HitTestBehavior.opaque,
+                                child: Padding(
+                                  padding: const EdgeInsets.symmetric(
+                                      vertical: 4),
+                                  child: Text(
+                                    'Forgot password?',
+                                    style: TextStyle(
+                                      fontSize: 13,
+                                      fontWeight: FontWeight.w600,
+                                      color: t.fg,
                                     ),
-                            behavior: HitTestBehavior.opaque,
-                            child: Padding(
-                              padding: const EdgeInsets.symmetric(vertical: 4),
-                              child: RichText(
-                                text: TextSpan(
-                                  style: TextStyle(fontSize: 13, color: t.muted),
-                                  children: [
-                                    const TextSpan(
-                                        text: "Don't have an account?  "),
-                                    TextSpan(
-                                      text: 'Sign up',
-                                      style: TextStyle(
-                                        color: t.fg,
-                                        fontWeight: FontWeight.w700,
-                                      ),
-                                    ),
-                                  ],
+                                  ),
                                 ),
                               ),
                             ),
-                          ),
+                            const SizedBox(height: 14),
+                            _PrimaryPillButton(
+                              t: t,
+                              label:
+                                  _isLoading ? 'Signing in…' : 'Sign in',
+                              onTap:
+                                  _isLoading ? null : _handleSignIn,
+                            ),
+                            const SizedBox(height: 18),
+                            _OrDivider(t: t),
+                            const SizedBox(height: 18),
+                            _GooglePillButton(
+                              t: t,
+                              onTap: _isLoading
+                                  ? null
+                                  : _handleGoogleSignIn,
+                            ),
+                            const SizedBox(height: 22),
+                            Center(
+                              child: GestureDetector(
+                                onTap: _isLoading
+                                    ? null
+                                    : () => Navigator.push(
+                                          context,
+                                          MaterialPageRoute(
+                                            builder: (_) =>
+                                                const SignUpScreen(),
+                                          ),
+                                        ),
+                                behavior: HitTestBehavior.opaque,
+                                child: Padding(
+                                  padding: const EdgeInsets.symmetric(
+                                      vertical: 4),
+                                  child: RichText(
+                                    text: TextSpan(
+                                      style: TextStyle(
+                                          fontSize: 13, color: t.muted),
+                                      children: [
+                                        const TextSpan(
+                                            text:
+                                                "Don't have an account?  "),
+                                        TextSpan(
+                                          text: 'Sign up',
+                                          style: TextStyle(
+                                            color: t.fg,
+                                            fontWeight: FontWeight.w700,
+                                          ),
+                                        ),
+                                      ],
+                                    ),
+                                  ),
+                                ),
+                              ),
+                            ),
+                          ],
                         ),
-                      ],
+                      ),
                     ),
                   ),
                 ),
               ),
             ),
-          ),
-        ],
+          ],
+        ),
       ),
     );
   }
@@ -280,29 +298,19 @@ class _GlassTheme {
   final Color fg;
   final Color muted;
   final Color placeholder;
-
-  // backdrop
   final List<Color> bgStops;
   final List<Color> orbColors;
-
-  // card
   final List<Color> cardFill;
   final Color cardBorder;
   final List<BoxShadow> cardShadow;
-
-  // field
   final List<Color> fieldFill;
   final Color fieldBorder;
   final List<BoxShadow> fieldShadow;
-
-  // primary button
   final List<Color> btnFill;
   final Color btnFg;
   final Color btnBorder;
   final List<BoxShadow> btnShadow;
-
-  // misc
-  final Color innerHi; // top inner highlight
+  final Color innerHi;
 
   const _GlassTheme({
     required this.dark,
@@ -329,31 +337,43 @@ class _GlassTheme {
   static final _light = _GlassTheme(
     dark: false,
     fg: const Color(0xFF0E1124),
-    muted: const Color(0x8C141628), // ~55%
+    muted: const Color(0x8C141628),
     placeholder: const Color(0x6B141628),
     bgStops: const [Color(0xFFF4F4F6), Color(0xFFE4E4E8), Color(0xFFD6D6DC)],
     orbColors: const [
-      Color(0x52141416), // dark
+      Color(0x52141416),
       Color(0x42141416),
-      Color(0xF2FFFFFF), // bright white
+      Color(0xF2FFFFFF),
       Color(0x38141416),
       Color(0x3D141416),
     ],
     cardFill: const [Color(0x61FFFFFF), Color(0x2EFFFFFF)],
     cardBorder: const Color(0xD9FFFFFF),
     cardShadow: const [
-      BoxShadow(color: Color(0x40282050), blurRadius: 60, offset: Offset(0, 30), spreadRadius: -20),
+      BoxShadow(
+          color: Color(0x40282050),
+          blurRadius: 60,
+          offset: Offset(0, 30),
+          spreadRadius: -20),
     ],
     fieldFill: const [Color(0x73FFFFFF), Color(0x33FFFFFF)],
     fieldBorder: const Color(0xD9FFFFFF),
     fieldShadow: const [
-      BoxShadow(color: Color(0x2E282050), blurRadius: 18, offset: Offset(0, 6), spreadRadius: -8),
+      BoxShadow(
+          color: Color(0x2E282050),
+          blurRadius: 18,
+          offset: Offset(0, 6),
+          spreadRadius: -8),
     ],
     btnFill: const [Color(0xFF5A5A60), Color(0xFF3D3D42)],
     btnFg: const Color(0xFFFFFFFF),
     btnBorder: const Color(0x33FFFFFF),
     btnShadow: const [
-      BoxShadow(color: Color(0x59282026), blurRadius: 30, offset: Offset(0, 14), spreadRadius: -10),
+      BoxShadow(
+          color: Color(0x59282026),
+          blurRadius: 30,
+          offset: Offset(0, 14),
+          spreadRadius: -10),
     ],
     innerHi: const Color(0xF2FFFFFF),
   );
@@ -361,11 +381,11 @@ class _GlassTheme {
   static final _dark = _GlassTheme(
     dark: true,
     fg: const Color(0xFFF5F4FF),
-    muted: const Color(0x99F5F4FF), // 60%
+    muted: const Color(0x99F5F4FF),
     placeholder: const Color(0x6BF5F4FF),
     bgStops: const [Color(0xFF1C1C1F), Color(0xFF0D0D0F), Color(0xFF050506)],
     orbColors: const [
-      Color(0x8CFFFFFF), // bright
+      Color(0x8CFFFFFF),
       Color(0x59FFFFFF),
       Color(0x66FFFFFF),
       Color(0x47FFFFFF),
@@ -374,18 +394,30 @@ class _GlassTheme {
     cardFill: const [Color(0x1FFFFFFF), Color(0x0AFFFFFF)],
     cardBorder: const Color(0x2EFFFFFF),
     cardShadow: const [
-      BoxShadow(color: Color(0xB3000000), blurRadius: 60, offset: Offset(0, 30), spreadRadius: -20),
+      BoxShadow(
+          color: Color(0xB3000000),
+          blurRadius: 60,
+          offset: Offset(0, 30),
+          spreadRadius: -20),
     ],
     fieldFill: const [Color(0x1AFFFFFF), Color(0x08FFFFFF)],
     fieldBorder: const Color(0x29FFFFFF),
     fieldShadow: const [
-      BoxShadow(color: Color(0x80000000), blurRadius: 18, offset: Offset(0, 6), spreadRadius: -8),
+      BoxShadow(
+          color: Color(0x80000000),
+          blurRadius: 18,
+          offset: Offset(0, 6),
+          spreadRadius: -8),
     ],
     btnFill: const [Color(0xFFF2F2F7), Color(0xFFE6E6F5)],
     btnFg: const Color(0xFF0B0A18),
     btnBorder: const Color(0x66FFFFFF),
     btnShadow: const [
-      BoxShadow(color: Color(0x99000000), blurRadius: 30, offset: Offset(0, 14), spreadRadius: -10),
+      BoxShadow(
+          color: Color(0x99000000),
+          blurRadius: 30,
+          offset: Offset(0, 14),
+          spreadRadius: -10),
     ],
     innerHi: const Color(0x59FFFFFF),
   );
@@ -408,14 +440,17 @@ class _Backdrop extends StatelessWidget {
           colors: t.bgStops,
         ),
       ),
-      child: Stack(
-        children: [
-          _Orb(color: t.orbColors[0], size: 320, left: -60, top: -40),
-          _Orb(color: t.orbColors[1], size: 300, right: -60, top: 40),
-          _Orb(color: t.orbColors[2], size: 360, left: 30, top: 320),
-          _Orb(color: t.orbColors[3], size: 260, right: -50, bottom: 80),
-          _Orb(color: t.orbColors[4], size: 300, left: -40, bottom: -30),
-        ],
+      child: ClipRect(
+        child: Stack(
+          fit: StackFit.expand,
+          children: [
+            _Orb(color: t.orbColors[0], size: 320, left: -60, top: -40),
+            _Orb(color: t.orbColors[1], size: 300, right: -60, top: 40),
+            _Orb(color: t.orbColors[2], size: 360, left: 30, top: 320),
+            _Orb(color: t.orbColors[3], size: 260, right: -50, bottom: 80),
+            _Orb(color: t.orbColors[4], size: 300, left: -40, bottom: -30),
+          ],
+        ),
       ),
     );
   }
@@ -425,7 +460,10 @@ class _Orb extends StatelessWidget {
   const _Orb({
     required this.color,
     required this.size,
-    this.left, this.right, this.top, this.bottom,
+    this.left,
+    this.right,
+    this.top,
+    this.bottom,
   });
   final Color color;
   final double size;
@@ -434,10 +472,14 @@ class _Orb extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     return Positioned(
-      left: left, right: right, top: top, bottom: bottom,
+      left: left,
+      right: right,
+      top: top,
+      bottom: bottom,
       child: IgnorePointer(
         child: Container(
-          width: size, height: size,
+          width: size,
+          height: size,
           decoration: BoxDecoration(
             shape: BoxShape.circle,
             gradient: RadialGradient(
@@ -502,10 +544,13 @@ class _GlassCard extends StatelessWidget {
             ),
           ),
           child: Stack(children: [
-            // top inner highlight
             Positioned(
-              top: 0, left: 24, right: 24,
-              child: Container(height: 1.2, color: t.innerHi.withValues(alpha: 0.7)),
+              top: 0,
+              left: 24,
+              right: 24,
+              child: Container(
+                  height: 1.2,
+                  color: t.innerHi.withValues(alpha: 0.7)),
             ),
             child,
           ]),
@@ -516,40 +561,47 @@ class _GlassCard extends StatelessWidget {
 }
 
 class _GlassChip extends StatelessWidget {
-  const _GlassChip({required this.t, required this.size, required this.radius});
+  const _GlassChip(
+      {required this.t, required this.size, required this.radius});
   final _GlassTheme t;
   final double size;
   final double radius;
 
   @override
   Widget build(BuildContext context) {
-    return Container(
-      decoration: BoxDecoration(
-        borderRadius: BorderRadius.circular(radius),
-        boxShadow: t.fieldShadow,
-      ),
-      child: _Frosted(
-        radius: radius,
-        sigma: 28,
-        child: Container(
-          width: size, height: size,
-          decoration: BoxDecoration(
-            borderRadius: BorderRadius.circular(radius),
-            border: Border.all(color: t.fieldBorder, width: 1),
-            gradient: LinearGradient(
-              begin: Alignment.topLeft,
-              end: Alignment.bottomRight,
-              colors: t.dark
-                  ? const [Color(0x24FFFFFF), Color(0x0AFFFFFF)]
-                  : const [Color(0x59FFFFFF), Color(0x1AFFFFFF)],
+    return IgnorePointer(
+      child: Container(
+        decoration: BoxDecoration(
+          borderRadius: BorderRadius.circular(radius),
+          boxShadow: t.fieldShadow,
+        ),
+        child: _Frosted(
+          radius: radius,
+          sigma: 28,
+          child: Container(
+            width: size,
+            height: size,
+            decoration: BoxDecoration(
+              borderRadius: BorderRadius.circular(radius),
+              border: Border.all(color: t.fieldBorder, width: 1),
+              gradient: LinearGradient(
+                begin: Alignment.topLeft,
+                end: Alignment.bottomRight,
+                colors: t.dark
+                    ? const [Color(0x24FFFFFF), Color(0x0AFFFFFF)]
+                    : const [Color(0x59FFFFFF), Color(0x1AFFFFFF)],
+              ),
             ),
+            child: Stack(children: [
+              Positioned(
+                top: 0,
+                left: 16,
+                right: 16,
+                child: Container(
+                    height: 1, color: t.innerHi.withValues(alpha: 0.6)),
+              ),
+            ]),
           ),
-          child: Stack(children: [
-            Positioned(
-              top: 0, left: 16, right: 16,
-              child: Container(height: 1, color: t.innerHi.withValues(alpha: 0.6)),
-            ),
-          ]),
         ),
       ),
     );
@@ -571,7 +623,8 @@ class _GlassMark extends StatelessWidget {
         radius: 20,
         sigma: 20,
         child: Container(
-          width: 64, height: 64,
+          width: 64,
+          height: 64,
           decoration: BoxDecoration(
             borderRadius: BorderRadius.circular(20),
             border: Border.all(color: t.fieldBorder, width: 1),
@@ -585,8 +638,11 @@ class _GlassMark extends StatelessWidget {
           ),
           child: Stack(children: [
             Positioned(
-              top: 0, left: 10, right: 10,
-              child: Container(height: 1, color: t.innerHi.withValues(alpha: 0.7)),
+              top: 0,
+              left: 10,
+              right: 10,
+              child: Container(
+                  height: 1, color: t.innerHi.withValues(alpha: 0.7)),
             ),
             Center(
               child: Icon(Icons.auto_awesome, size: 28, color: t.fg),
@@ -667,10 +723,12 @@ class _GlassField extends StatelessWidget {
             ),
           ),
           child: Stack(children: [
-            // top inner highlight
             Positioned(
-              top: 0, left: 18, right: 18,
-              child: Container(height: 1, color: t.innerHi.withValues(alpha: 0.7)),
+              top: 0,
+              left: 18,
+              right: 18,
+              child: Container(
+                  height: 1, color: t.innerHi.withValues(alpha: 0.7)),
             ),
             TextField(
               controller: controller,
@@ -694,8 +752,10 @@ class _GlassField extends StatelessWidget {
                     ? GestureDetector(
                         onTap: onSuffixTap,
                         child: Padding(
-                          padding: const EdgeInsets.only(right: 18, left: 8),
-                          child: Icon(suffixIcon, color: t.muted, size: 20),
+                          padding:
+                              const EdgeInsets.only(right: 18, left: 8),
+                          child: Icon(suffixIcon,
+                              color: t.muted, size: 20),
                         ),
                       )
                     : null,
@@ -752,10 +812,12 @@ class _PrimaryPillButton extends StatelessWidget {
             ),
             child: Stack(children: [
               Positioned(
-                top: 0, left: 18, right: 18,
+                top: 0,
+                left: 18,
+                right: 18,
                 child: Container(
                   height: 1.2,
-                  color: (t.dark ? Colors.white : Colors.white)
+                  color: Colors.white
                       .withValues(alpha: t.dark ? 0.85 : 0.32),
                 ),
               ),
@@ -783,9 +845,8 @@ class _OrDivider extends StatelessWidget {
   final _GlassTheme t;
   @override
   Widget build(BuildContext context) {
-    final lineColor = t.dark
-        ? const Color(0x38FFFFFF)
-        : const Color(0x2E141628);
+    final lineColor =
+        t.dark ? const Color(0x38FFFFFF) : const Color(0x2E141628);
     return Row(children: [
       Expanded(child: Divider(color: lineColor, thickness: 1, height: 1)),
       Padding(
@@ -840,8 +901,12 @@ class _GooglePillButton extends StatelessWidget {
               ),
               child: Stack(children: [
                 Positioned(
-                  top: 0, left: 18, right: 18,
-                  child: Container(height: 1, color: t.innerHi.withValues(alpha: 0.7)),
+                  top: 0,
+                  left: 18,
+                  right: 18,
+                  child: Container(
+                      height: 1,
+                      color: t.innerHi.withValues(alpha: 0.7)),
                 ),
                 Center(
                   child: Row(
@@ -870,7 +935,6 @@ class _GooglePillButton extends StatelessWidget {
   }
 }
 
-/// Multi-color "G" glyph — Google brand colors.
 class _GoogleGlyph extends StatelessWidget {
   const _GoogleGlyph({this.size = 20});
   final double size;
@@ -889,59 +953,59 @@ class _GoogleGlyphPainter extends CustomPainter {
   void paint(Canvas canvas, Size size) {
     final s = size.width / 48.0;
     final paint = Paint()..style = PaintingStyle.fill;
-
-    // Red
     paint.color = const Color(0xFFEA4335);
-    final red = Path()
-      ..moveTo(24 * s, 9.5 * s)
-      ..cubicTo(27.5 * s, 9.5 * s, 30.6 * s, 10.7 * s, 33 * s, 13.1 * s)
-      ..lineTo(39.7 * s, 6.4 * s)
-      ..cubicTo(35.6 * s, 2.7 * s, 30.2 * s, 0.5 * s, 24 * s, 0.5 * s)
-      ..cubicTo(14.8 * s, 0.5 * s, 6.9 * s, 5.8 * s, 3 * s, 13.6 * s)
-      ..lineTo(10.8 * s, 19.6 * s)
-      ..cubicTo(12.7 * s, 13.9 * s, 18 * s, 9.5 * s, 24 * s, 9.5 * s)
-      ..close();
-    canvas.drawPath(red, paint);
-
-    // Blue
+    canvas.drawPath(
+      Path()
+        ..moveTo(24 * s, 9.5 * s)
+        ..cubicTo(27.5 * s, 9.5 * s, 30.6 * s, 10.7 * s, 33 * s, 13.1 * s)
+        ..lineTo(39.7 * s, 6.4 * s)
+        ..cubicTo(35.6 * s, 2.7 * s, 30.2 * s, 0.5 * s, 24 * s, 0.5 * s)
+        ..cubicTo(14.8 * s, 0.5 * s, 6.9 * s, 5.8 * s, 3 * s, 13.6 * s)
+        ..lineTo(10.8 * s, 19.6 * s)
+        ..cubicTo(12.7 * s, 13.9 * s, 18 * s, 9.5 * s, 24 * s, 9.5 * s)
+        ..close(),
+      paint,
+    );
     paint.color = const Color(0xFF4285F4);
-    final blue = Path()
-      ..moveTo(46.5 * s, 24.5 * s)
-      ..cubicTo(46.5 * s, 22.9 * s, 46.4 * s, 21.4 * s, 46.1 * s, 20 * s)
-      ..lineTo(24 * s, 20 * s)
-      ..lineTo(24 * s, 29 * s)
-      ..lineTo(36.7 * s, 29 * s)
-      ..cubicTo(36.1 * s, 32 * s, 34.4 * s, 34.6 * s, 31.8 * s, 36.3 * s)
-      ..lineTo(39.4 * s, 42.2 * s)
-      ..cubicTo(43.8 * s, 38.1 * s, 46.5 * s, 32.1 * s, 46.5 * s, 24.5 * s)
-      ..close();
-    canvas.drawPath(blue, paint);
-
-    // Yellow
+    canvas.drawPath(
+      Path()
+        ..moveTo(46.5 * s, 24.5 * s)
+        ..cubicTo(46.5 * s, 22.9 * s, 46.4 * s, 21.4 * s, 46.1 * s, 20 * s)
+        ..lineTo(24 * s, 20 * s)
+        ..lineTo(24 * s, 29 * s)
+        ..lineTo(36.7 * s, 29 * s)
+        ..cubicTo(36.1 * s, 32 * s, 34.4 * s, 34.6 * s, 31.8 * s, 36.3 * s)
+        ..lineTo(39.4 * s, 42.2 * s)
+        ..cubicTo(43.8 * s, 38.1 * s, 46.5 * s, 32.1 * s, 46.5 * s, 24.5 * s)
+        ..close(),
+      paint,
+    );
     paint.color = const Color(0xFFFBBC05);
-    final yellow = Path()
-      ..moveTo(10.8 * s, 28.4 * s)
-      ..cubicTo(10.3 * s, 27 * s, 10 * s, 25.5 * s, 10 * s, 24 * s)
-      ..cubicTo(10 * s, 22.5 * s, 10.3 * s, 21 * s, 10.8 * s, 19.6 * s)
-      ..lineTo(3 * s, 13.6 * s)
-      ..cubicTo(1.4 * s, 16.7 * s, 0.5 * s, 20.3 * s, 0.5 * s, 24 * s)
-      ..cubicTo(0.5 * s, 27.7 * s, 1.4 * s, 31.3 * s, 3 * s, 34.4 * s)
-      ..lineTo(10.8 * s, 28.4 * s)
-      ..close();
-    canvas.drawPath(yellow, paint);
-
-    // Green
+    canvas.drawPath(
+      Path()
+        ..moveTo(10.8 * s, 28.4 * s)
+        ..cubicTo(10.3 * s, 27 * s, 10 * s, 25.5 * s, 10 * s, 24 * s)
+        ..cubicTo(10 * s, 22.5 * s, 10.3 * s, 21 * s, 10.8 * s, 19.6 * s)
+        ..lineTo(3 * s, 13.6 * s)
+        ..cubicTo(1.4 * s, 16.7 * s, 0.5 * s, 20.3 * s, 0.5 * s, 24 * s)
+        ..cubicTo(0.5 * s, 27.7 * s, 1.4 * s, 31.3 * s, 3 * s, 34.4 * s)
+        ..lineTo(10.8 * s, 28.4 * s)
+        ..close(),
+      paint,
+    );
     paint.color = const Color(0xFF34A853);
-    final green = Path()
-      ..moveTo(24 * s, 47.5 * s)
-      ..cubicTo(30.2 * s, 47.5 * s, 35.4 * s, 45.5 * s, 39.2 * s, 42.1 * s)
-      ..lineTo(31.6 * s, 36.2 * s)
-      ..cubicTo(29.5 * s, 37.6 * s, 26.8 * s, 38.5 * s, 24 * s, 38.5 * s)
-      ..cubicTo(18 * s, 38.5 * s, 12.7 * s, 34.1 * s, 10.8 * s, 28.4 * s)
-      ..lineTo(3 * s, 34.4 * s)
-      ..cubicTo(6.9 * s, 42.2 * s, 14.8 * s, 47.5 * s, 24 * s, 47.5 * s)
-      ..close();
-    canvas.drawPath(green, paint);
+    canvas.drawPath(
+      Path()
+        ..moveTo(24 * s, 47.5 * s)
+        ..cubicTo(30.2 * s, 47.5 * s, 35.4 * s, 45.5 * s, 39.2 * s, 42.1 * s)
+        ..lineTo(31.6 * s, 36.2 * s)
+        ..cubicTo(29.5 * s, 37.6 * s, 26.8 * s, 38.5 * s, 24 * s, 38.5 * s)
+        ..cubicTo(18 * s, 38.5 * s, 12.7 * s, 34.1 * s, 10.8 * s, 28.4 * s)
+        ..lineTo(3 * s, 34.4 * s)
+        ..cubicTo(6.9 * s, 42.2 * s, 14.8 * s, 47.5 * s, 24 * s, 47.5 * s)
+        ..close(),
+      paint,
+    );
   }
 
   @override

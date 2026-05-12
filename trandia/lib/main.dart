@@ -83,6 +83,8 @@ class _TrandiaAppState extends State<TrandiaApp> {
           colorScheme: ColorScheme.fromSeed(seedColor: Colors.deepPurple),
           useMaterial3: true,
         ),
+        darkTheme: ThemeData.dark(),
+        themeMode: ThemeMode.system,
         home: const _SplashRouter(),
       );
 }

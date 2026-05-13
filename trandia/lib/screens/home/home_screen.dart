@@ -1,12 +1,13 @@
+import 'dart:math' as math;
 import 'dart:ui' as ui;
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 
 const double _kBtnSize  = 64.0;
 const double _kNavWidth = _kBtnSize;
-const double _kItemH    = 52.0;
+const double _kItemH    = 54.0;
 const double _kNavGap   = 6.0;
-const double _kIconSize = 24.0; // same for both msg icon & navbar icons
+const double _kIconSize = 24.0;
 
 class HomeScreen extends StatefulWidget {
   const HomeScreen({super.key});
@@ -20,29 +21,57 @@ class _HomeScreenState extends State<HomeScreen>
   int  _activeNav = 0;
 
   late AnimationController _navCtrl;
-  late Animation<double>   _navFade;
-  late Animation<double>   _navScale;
-  late Animation<Offset>   _navSlide;
+
+  // individual staggered item animations
+  final List<Animation<double>> _itemScales   = [];
+  final List<Animation<double>> _itemOpacities = [];
 
   @override
   void initState() {
     super.initState();
     _navCtrl = AnimationController(
-        vsync: this, duration: const Duration(milliseconds: 280));
-    _navFade  = CurvedAnimation(parent: _navCtrl, curve: Curves.easeOut);
-    _navScale = Tween<double>(begin: 0.88, end: 1.0)
-        .animate(CurvedAnimation(parent: _navCtrl, curve: Curves.easeOutBack));
-    _navSlide = Tween<Offset>(begin: const Offset(0, 0.12), end: Offset.zero)
-        .animate(CurvedAnimation(parent: _navCtrl, curve: Curves.easeOutCubic));
+      vsync: this,
+      duration: const Duration(milliseconds: 480),
+    );
+
+    // Stagger each item: items appear bottom→top with spring
+    for (int i = 0; i < 5; i++) {
+      // reversed: item 4 (bottom) first, item 0 (top) last
+      final start = (4 - i) * 0.08;
+      final end   = start + 0.55;
+
+      _itemScales.add(
+        Tween<double>(begin: 0.0, end: 1.0).animate(
+          CurvedAnimation(
+            parent: _navCtrl,
+            curve: Interval(start, end.clamp(0, 1).toDouble(),
+                curve: Curves.easeOutBack),
+          ),
+        ),
+      );
+      _itemOpacities.add(
+        Tween<double>(begin: 0.0, end: 1.0).animate(
+          CurvedAnimation(
+            parent: _navCtrl,
+            curve: Interval(start, (start + 0.30).clamp(0, 1).toDouble(),
+                curve: Curves.easeOut),
+          ),
+        ),
+      );
+    }
   }
 
   @override
   void dispose() { _navCtrl.dispose(); super.dispose(); }
 
   void _toggleNav() {
-    HapticFeedback.lightImpact();
+    HapticFeedback.mediumImpact();
     setState(() => _navOpen = !_navOpen);
-    _navOpen ? _navCtrl.forward() : _navCtrl.reverse();
+    if (_navOpen) {
+      _navCtrl.forward(from: 0);
+    } else {
+      _navCtrl.reverse();
+    }
   }
 
   @override
@@ -77,7 +106,6 @@ class _HomeScreenState extends State<HomeScreen>
           child: Container(color: (isDark ? Colors.black : Colors.white).withOpacity(0.1)),
         )),
 
-        // Content
         SafeArea(child: Stack(children: [
 
           // Trandia Island
@@ -85,13 +113,13 @@ class _HomeScreenState extends State<HomeScreen>
             child: Padding(padding: const EdgeInsets.only(top: 8),
               child: _TrandiaIsland(background: islandBg, textColor: islandText))),
 
-          // ── Message icon top-right ──
+          // Message icon
           Align(alignment: Alignment.topRight,
             child: Padding(padding: const EdgeInsets.only(top: 10, right: 16),
               child: GestureDetector(
                 onTap: () {},
                 child: SizedBox(
-                  width: 36, height: 36,   // smaller tap container
+                  width: 36, height: 36,
                   child: Center(
                     child: CustomPaint(
                       size: const Size(_kIconSize, _kIconSize),
@@ -101,30 +129,28 @@ class _HomeScreenState extends State<HomeScreen>
                 ),
               ))),
 
-          // ── Vertical navbar ──
+          // Vertical navbar — staggered pop
           Positioned(
             bottom: 30 + _kBtnSize + _kNavGap,
             right: 20,
             child: AnimatedBuilder(
               animation: _navCtrl,
-              builder: (_, __) => IgnorePointer(
-                ignoring: !_navOpen,
-                child: FadeTransition(opacity: _navFade,
-                  child: SlideTransition(position: _navSlide,
-                    child: ScaleTransition(
-                      scale: _navScale,
-                      alignment: Alignment.bottomCenter,
-                      child: _VerticalNav(
-                        isDark: isDark,
-                        activeIndex: _activeNav,
-                        onTap: (i) => setState(() => _activeNav = i),
-                      ),
-                    ))),
-              ),
+              builder: (_, __) {
+                return IgnorePointer(
+                  ignoring: !_navOpen,
+                  child: _StaggeredNavbar(
+                    isDark: isDark,
+                    activeIndex: _activeNav,
+                    itemScales: _itemScales,
+                    itemOpacities: _itemOpacities,
+                    onTap: (i) => setState(() => _activeNav = i),
+                  ),
+                );
+              },
             ),
           ),
 
-          // ── Infinity button ──
+          // Infinity button
           Positioned(
             bottom: 30, right: 20,
             child: _InfinityBtn(isDark: isDark, isOpen: _navOpen, onTap: _toggleNav),
@@ -136,8 +162,109 @@ class _HomeScreenState extends State<HomeScreen>
 }
 
 // ══════════════════════════════════════════════════════
-//  ENVELOPE / MAIL ICON  (matches image 1)
-//  Rounded rect body + V-fold lines, stroke style
+//  STAGGERED NAVBAR — each icon pops in with spring
+// ══════════════════════════════════════════════════════
+class _StaggeredNavbar extends StatelessWidget {
+  final bool isDark;
+  final int  activeIndex;
+  final List<Animation<double>> itemScales;
+  final List<Animation<double>> itemOpacities;
+  final ValueChanged<int> onTap;
+
+  const _StaggeredNavbar({
+    required this.isDark,
+    required this.activeIndex,
+    required this.itemScales,
+    required this.itemOpacities,
+    required this.onTap,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    final navH   = 5 * _kItemH + 12.0;
+    final glass  = (isDark ? Colors.white : Colors.black).withOpacity(0.09);
+    final border = (isDark ? Colors.white : Colors.black).withOpacity(0.16);
+
+    // container fades in as a whole
+    final containerOpacity = itemOpacities.last; // last starts earliest
+
+    return FadeTransition(
+      opacity: containerOpacity,
+      child: ClipRRect(
+        borderRadius: BorderRadius.circular(_kNavWidth / 2),
+        child: BackdropFilter(
+          filter: ui.ImageFilter.blur(sigmaX: 28, sigmaY: 28),
+          child: Container(
+            width: _kNavWidth,
+            height: navH,
+            decoration: BoxDecoration(
+              color: glass,
+              borderRadius: BorderRadius.circular(_kNavWidth / 2),
+              border: Border.all(color: border, width: 0.8),
+              boxShadow: [
+                BoxShadow(
+                  color: Colors.black.withOpacity(isDark ? 0.35 : 0.10),
+                  blurRadius: 20, offset: const Offset(0, 6),
+                ),
+              ],
+            ),
+            child: Padding(
+              padding: const EdgeInsets.symmetric(vertical: 6),
+              child: Column(
+                mainAxisAlignment: MainAxisAlignment.spaceEvenly,
+                children: List.generate(5, (i) {
+                  final active = activeIndex == i;
+                  return ScaleTransition(
+                    scale: itemScales[i],
+                    child: FadeTransition(
+                      opacity: itemOpacities[i],
+                      child: GestureDetector(
+                        onTap: () {
+                          HapticFeedback.selectionClick();
+                          onTap(i);
+                        },
+                        behavior: HitTestBehavior.opaque,
+                        child: SizedBox(
+                          width: _kNavWidth,
+                          height: _kItemH,
+                          child: Center(
+                            child: AnimatedContainer(
+                              duration: const Duration(milliseconds: 220),
+                              curve: Curves.easeOutCubic,
+                              width: 38, height: 38,
+                              decoration: BoxDecoration(
+                                shape: BoxShape.circle,
+                                color: active
+                                    ? (isDark
+                                        ? Colors.white.withOpacity(0.18)
+                                        : Colors.black.withOpacity(0.12))
+                                    : Colors.transparent,
+                              ),
+                              child: Center(
+                                child: CustomPaint(
+                                  size: const Size(_kIconSize, _kIconSize),
+                                  painter: _NavIconPainter(
+                                      index: i, isDark: isDark, active: active),
+                                ),
+                              ),
+                            ),
+                          ),
+                        ),
+                      ),
+                    ),
+                  );
+                }),
+              ),
+            ),
+          ),
+        ),
+      ),
+    );
+  }
+}
+
+// ══════════════════════════════════════════════════════
+//  ENVELOPE ICON — smooth curves, no sharp corners
 // ══════════════════════════════════════════════════════
 class _EnvelopeIconPainter extends CustomPainter {
   final bool isDark;
@@ -150,24 +277,23 @@ class _EnvelopeIconPainter extends CustomPainter {
     final h = size.height;
 
     final p = Paint()
-      ..color = color
+      ..color = color.withOpacity(0.90)
       ..style = PaintingStyle.stroke
       ..strokeWidth = 1.8
       ..strokeCap = StrokeCap.round
       ..strokeJoin = StrokeJoin.round;
 
-    // Rounded rect body
+    // Outer rounded envelope body — large radius for soft look
     final body = RRect.fromRectAndRadius(
-      Rect.fromLTWH(0.9, 1.5, w - 1.8, h - 3.0),
-      const Radius.circular(3.5),
+      Rect.fromLTWH(0.5, 1.2, w - 1.0, h - 2.4),
+      const Radius.circular(5.0),
     );
     canvas.drawRRect(body, p);
 
-    // V-fold: left-top corner → center-top-area → right-top corner
+    // V-fold — curved, not sharp. Use quadratic bezier for soft peak
     final fold = Path()
-      ..moveTo(0.9 + 3.5, 1.5)          // top-left corner of body
-      ..lineTo(w / 2, h * 0.52)          // center fold point
-      ..lineTo(w - 0.9 - 3.5, 1.5);     // top-right corner of body
+      ..moveTo(0.5 + 5.0, 1.2)
+      ..quadraticBezierTo(w / 2, h * 0.55, w - 0.5 - 5.0, 1.2);
     canvas.drawPath(fold, p);
   }
 
@@ -176,87 +302,10 @@ class _EnvelopeIconPainter extends CustomPainter {
 }
 
 // ══════════════════════════════════════════════════════
-//  VERTICAL PILL NAVBAR
-// ══════════════════════════════════════════════════════
-class _VerticalNav extends StatelessWidget {
-  final bool isDark;
-  final int  activeIndex;
-  final ValueChanged<int> onTap;
-  const _VerticalNav({required this.isDark, required this.activeIndex, required this.onTap});
-
-  @override
-  Widget build(BuildContext context) {
-    final navH   = 5 * _kItemH + 12.0;
-    final glass  = (isDark ? Colors.white : Colors.black).withOpacity(0.08);
-    final border = (isDark ? Colors.white : Colors.black).withOpacity(0.16);
-
-    return ClipRRect(
-      borderRadius: BorderRadius.circular(_kNavWidth / 2),
-      child: BackdropFilter(
-        filter: ui.ImageFilter.blur(sigmaX: 28, sigmaY: 28),
-        child: Container(
-          width: _kNavWidth,
-          height: navH,
-          decoration: BoxDecoration(
-            color: glass,
-            borderRadius: BorderRadius.circular(_kNavWidth / 2),
-            border: Border.all(color: border, width: 0.8),
-            boxShadow: [
-              BoxShadow(
-                color: Colors.black.withOpacity(isDark ? 0.35 : 0.10),
-                blurRadius: 20, offset: const Offset(0, 6),
-              ),
-            ],
-          ),
-          child: Padding(
-            padding: const EdgeInsets.symmetric(vertical: 6),
-            child: Column(
-              mainAxisAlignment: MainAxisAlignment.spaceEvenly,
-              children: List.generate(5, (i) {
-                final active = activeIndex == i;
-                return GestureDetector(
-                  onTap: () => onTap(i),
-                  behavior: HitTestBehavior.opaque,
-                  child: SizedBox(
-                    width: _kNavWidth,
-                    height: _kItemH,
-                    child: Center(
-                      child: AnimatedContainer(
-                        duration: const Duration(milliseconds: 200),
-                        width: 38, height: 38,
-                        decoration: BoxDecoration(
-                          shape: BoxShape.circle,
-                          color: active
-                              ? (isDark
-                                  ? Colors.white.withOpacity(0.18)
-                                  : Colors.black.withOpacity(0.12))
-                              : Colors.transparent,
-                        ),
-                        child: Center(
-                          child: CustomPaint(
-                            size: const Size(_kIconSize, _kIconSize),
-                            painter: _NavIconPainter(
-                                index: i, isDark: isDark, active: active),
-                          ),
-                        ),
-                      ),
-                    ),
-                  ),
-                );
-              }),
-            ),
-          ),
-        ),
-      ),
-    );
-  }
-}
-
-// ══════════════════════════════════════════════════════
-//  NAV ICON PAINTERS  (exact match to reference images)
+//  NAV ICON PAINTERS — fully curved, no sharp corners
 // ══════════════════════════════════════════════════════
 class _NavIconPainter extends CustomPainter {
-  final int index;
+  final int  index;
   final bool isDark;
   final bool active;
   const _NavIconPainter(
@@ -265,18 +314,17 @@ class _NavIconPainter extends CustomPainter {
   @override
   void paint(Canvas canvas, Size size) {
     final base = isDark ? Colors.white : const Color(0xFF1A1A1A);
-    final col  = active ? base : base.withOpacity(0.52);
+    final col  = active ? base : base.withOpacity(0.50);
+    final sw   = active ? 1.8 : 1.6;
 
-    final stroke = Paint()
+    final p = Paint()
       ..color = col
       ..style = PaintingStyle.stroke
-      ..strokeWidth = 1.7
+      ..strokeWidth = sw
       ..strokeCap = StrokeCap.round
       ..strokeJoin = StrokeJoin.round;
 
-    final fill = Paint()
-      ..color = col
-      ..style = PaintingStyle.fill;
+    final filled = Paint()..color = col..style = PaintingStyle.fill;
 
     final w  = size.width;
     final h  = size.height;
@@ -285,91 +333,85 @@ class _NavIconPainter extends CustomPainter {
 
     switch (index) {
 
-      // ── 0: HOME — filled solid house (image 2) ──────────────────────
+      // ── 0 HOME — smooth house, all curves, no sharp angles ──────────
       case 0:
-        // Roof triangle (filled)
-        final roof = Path()
-          ..moveTo(cx, 1.0)
-          ..lineTo(w, h * 0.46)
-          ..lineTo(0, h * 0.46)
-          ..close();
-        canvas.drawPath(roof, fill);
+        // Roof: quadratic arc (smooth curved peak)
+        final roofPath = Path()
+          ..moveTo(w * 0.05, h * 0.52)
+          ..quadraticBezierTo(cx, h * 0.02, w * 0.95, h * 0.52);
+        canvas.drawPath(roofPath, p..strokeWidth = sw + 0.2);
 
-        // Body (filled rectangle)
-        final body = Rect.fromLTWH(w * 0.15, h * 0.46, w * 0.70, h * 0.54);
-        canvas.drawRect(body, fill);
-
-        // Door cutout (punch out with background color)
-        final doorC = isDark ? const Color(0xFF1C1C1F) : const Color(0xFFF8F8FA);
-        final door  = RRect.fromRectAndRadius(
-          Rect.fromLTWH(cx - w * 0.14, h * 0.66, w * 0.28, h * 0.34),
-          const Radius.circular(1.5),
+        // Body outline — rounded bottom corners
+        final body = RRect.fromRectAndRadius(
+          Rect.fromLTWH(w * 0.12, h * 0.50, w * 0.76, h * 0.46),
+          const Radius.circular(3.0),
         );
-        canvas.drawRRect(door, Paint()..color = doorC..style = PaintingStyle.fill);
+        canvas.drawRRect(body, p);
+
+        // Door — rounded rect, centered bottom
+        final door = RRect.fromRectAndRadius(
+          Rect.fromLTWH(cx - w * 0.13, h * 0.64, w * 0.26, h * 0.32),
+          const Radius.circular(2.5),
+        );
+        canvas.drawRRect(door, p);
         break;
 
-      // ── 1: SHOTS — circle + rounded-corner play triangle (image 3) ──
+      // ── 1 SHOTS — circle with curved rounded-triangle play ───────────
       case 1:
-        // Outer circle stroke
-        canvas.drawCircle(Offset(cx, cy), w / 2 - 1.0, stroke);
-        // Rounded play triangle (filled)
-        const offset = 1.5;
+        canvas.drawCircle(Offset(cx, cy), w / 2 - 1.0, p);
+        // Curved play triangle using cubics for rounded look
         final tri = Path()
-          ..moveTo(cx - 3.5 + offset, cy - 5.5)
-          ..lineTo(cx + 6.0 + offset, cy)
-          ..lineTo(cx - 3.5 + offset, cy + 5.5)
+          ..moveTo(cx - 3.5, cy - 5.0)
+          ..cubicTo(cx - 3.5, cy - 6.0, cx + 6.5, cy - 1.5, cx + 6.5, cy)
+          ..cubicTo(cx + 6.5, cy + 1.5, cx - 3.5, cy + 6.0, cx - 3.5, cy + 5.0)
+          ..cubicTo(cx - 3.5, cy + 4.0, cx - 3.5, cy - 4.0, cx - 3.5, cy - 5.0)
           ..close();
-        canvas.drawPath(tri, Paint()
-          ..color = col
-          ..style = PaintingStyle.stroke
-          ..strokeWidth = 1.7
-          ..strokeCap = StrokeCap.round
-          ..strokeJoin = StrokeJoin.round);
+        canvas.drawPath(tri, filled);
         break;
 
-      // ── 2: ADD — rounded square + plus (image 5) ────────────────────
+      // ── 2 ADD — rounded square + smooth plus ─────────────────────────
       case 2:
-        // Rounded square
         final box = RRect.fromRectAndRadius(
           Rect.fromLTWH(0.8, 0.8, w - 1.6, h - 1.6),
-          const Radius.circular(5.5),
+          const Radius.circular(6.0),
         );
-        canvas.drawRRect(box, stroke);
-        // Plus arms
-        canvas.drawLine(Offset(cx, cy - 5.5), Offset(cx, cy + 5.5), stroke);
-        canvas.drawLine(Offset(cx - 5.5, cy), Offset(cx + 5.5, cy), stroke);
+        canvas.drawRRect(box, p);
+        // Plus with rounded caps
+        canvas.drawLine(Offset(cx, cy - 5.0), Offset(cx, cy + 5.0), p);
+        canvas.drawLine(Offset(cx - 5.0, cy), Offset(cx + 5.0, cy), p);
         break;
 
-      // ── 3: SEARCH — magnifying glass (image 4) ──────────────────────
+      // ── 3 SEARCH — smooth circular magnifier ─────────────────────────
       case 3:
-        const r = 6.2;
-        final ox = cx - 2.5;
-        final oy = cy - 2.5;
-        // Glass circle
-        canvas.drawCircle(Offset(ox, oy), r, stroke);
-        // Handle — thick & rounded
+        final r  = w * 0.265;
+        final ox = cx - 2.8;
+        final oy = cy - 2.8;
+        canvas.drawCircle(Offset(ox, oy), r, p);
         canvas.drawLine(
-          Offset(ox + r * 0.68, oy + r * 0.68),
-          Offset(w - 1.2, h - 1.2),
+          Offset(ox + r * 0.72, oy + r * 0.72),
+          Offset(w - 1.0, h - 1.0),
           Paint()
             ..color = col
             ..style = PaintingStyle.stroke
-            ..strokeWidth = 2.2
+            ..strokeWidth = sw + 0.5
             ..strokeCap = StrokeCap.round,
         );
         break;
 
-      // ── 4: PROFILE — head circle + body dome (image 6) ──────────────
+      // ── 4 PROFILE — smooth head + curved body ────────────────────────
       case 4:
-        // Head (filled circle)
-        canvas.drawCircle(Offset(cx, h * 0.30), h * 0.185, fill);
-        // Body (filled half-ellipse / dome)
-        final bodyRect = Rect.fromCenter(
-          center: Offset(cx, h * 0.825),
-          width: w * 0.72,
-          height: h * 0.50,
-        );
-        canvas.drawArc(bodyRect, 3.14159, 3.14159, true, fill); // top half arc
+        // Head
+        canvas.drawCircle(Offset(cx, h * 0.30), h * 0.185, filled);
+        // Smooth curved body — cubic bezier dome
+        final body = Path()
+          ..moveTo(w * 0.06, h - 1.0)
+          ..cubicTo(
+            w * 0.06, h * 0.62,
+            w * 0.94, h * 0.62,
+            w * 0.94, h - 1.0,
+          )
+          ..close();
+        canvas.drawPath(body, filled);
         break;
     }
   }
@@ -380,7 +422,7 @@ class _NavIconPainter extends CustomPainter {
 }
 
 // ══════════════════════════════════════════════════════
-//  INFINITY BUTTON — glass, no glow
+//  INFINITY BUTTON
 // ══════════════════════════════════════════════════════
 class _InfinityBtn extends StatefulWidget {
   final bool isDark;
@@ -403,7 +445,7 @@ class _InfinityBtnState extends State<_InfinityBtn>
     super.initState();
     _ctrl  = AnimationController(
         vsync: this, duration: const Duration(milliseconds: 140));
-    _scale = Tween<double>(begin: 1.0, end: 0.93)
+    _scale = Tween<double>(begin: 1.0, end: 0.92)
         .animate(CurvedAnimation(parent: _ctrl, curve: Curves.easeInOut));
   }
 
@@ -440,8 +482,7 @@ class _InfinityBtnState extends State<_InfinityBtn>
                     ),
                   ],
                 ),
-                child: CustomPaint(
-                    painter: _InfinityPainter(color: iconC)),
+                child: CustomPaint(painter: _InfinityPainter(color: iconC)),
               ),
             ),
           ),
@@ -452,7 +493,7 @@ class _InfinityBtnState extends State<_InfinityBtn>
 }
 
 // ══════════════════════════════════════════════════════
-//  INFINITY PAINTER — smooth lemniscate
+//  INFINITY PAINTER
 // ══════════════════════════════════════════════════════
 class _InfinityPainter extends CustomPainter {
   final Color color;
@@ -490,9 +531,8 @@ class _InfinityPainter extends CustomPainter {
 class _Orb extends StatelessWidget {
   final Color color; final double size;
   final double? top, bottom, left, right;
-  const _Orb(
-      {required this.color, required this.size,
-        this.top, this.bottom, this.left, this.right});
+  const _Orb({required this.color, required this.size,
+      this.top, this.bottom, this.left, this.right});
 
   @override
   Widget build(BuildContext context) => Positioned(
@@ -508,8 +548,7 @@ class _Orb extends StatelessWidget {
 // ══════════════════════════════════════════════════════
 class _TrandiaIsland extends StatelessWidget {
   final Color background, textColor;
-  const _TrandiaIsland(
-      {required this.background, required this.textColor});
+  const _TrandiaIsland({required this.background, required this.textColor});
 
   @override
   Widget build(BuildContext context) => AnimatedContainer(

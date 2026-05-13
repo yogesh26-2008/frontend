@@ -4,7 +4,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 
 extension _ColorOp on Color {
-  Color op(double opacity) => withValues(alpha: opacity);
+  Color op(double opacity) => withOpacity(opacity);
 }
 
 const double _kBtnSize  = 64.0;
@@ -179,10 +179,8 @@ class _HomeScreenState extends State<HomeScreen>
             children: [
               _StorySection(isDark: isDark),
               const SizedBox(height: 6),
-              ..._kPosts.map((post) => Padding(
-                padding: const EdgeInsets.fromLTRB(2, 0, 2, 2),
-                child: _PostCard(
-                    key: ValueKey(post.user), post: post, isDark: isDark))),
+              ..._kPosts.map((post) => _PostCard(
+                    key: ValueKey(post.user), post: post, isDark: isDark)),
               const SizedBox(height: 130),
             ],
           ),
@@ -230,7 +228,7 @@ class _HomeScreenState extends State<HomeScreen>
 // ═════════════════════════════════════════════════════
 class _StorySection extends StatelessWidget {
   final bool isDark;
-  const _StorySection({super.key, required this.isDark});
+  const _StorySection({required this.isDark});
   @override
   Widget build(BuildContext context) => SizedBox(
     height: 110,
@@ -249,7 +247,7 @@ class _StorySection extends StatelessWidget {
 class _StoryBubble extends StatelessWidget {
   final _StoryData story;
   final bool       isDark;
-  const _StoryBubble({super.key, required this.story, required this.isDark});
+  const _StoryBubble({required this.story, required this.isDark});
   @override
   Widget build(BuildContext context) {
     return GestureDetector(
@@ -360,7 +358,7 @@ class _PostCardState extends State<_PostCard> {
   Widget build(BuildContext context) {
     final p    = widget.post;
     final dark = widget.isDark;
-    final Color glass       = (dark ? Colors.white : Colors.black).op(0.07);
+    // final Color glass       = (dark ? Colors.white : Colors.black).op(0.07);
     final Color border      = (dark ? Colors.white : Colors.black).op(0.12);
     final Color textPrimary = (dark ? Colors.white : Colors.black).op(0.90);
     final Color textSub     = (dark ? Colors.white : Colors.black).op(0.45);
@@ -368,20 +366,15 @@ class _PostCardState extends State<_PostCard> {
     final Color iconCol     = (dark ? Colors.white : Colors.black).op(0.80);
     final Color likedCol    = dark ? const Color(0xFFFF3040) : const Color(0xFFED4956);
 
-    return ClipRRect(
-      borderRadius: BorderRadius.circular(20),
-      child: BackdropFilter(
-        filter: ui.ImageFilter.blur(sigmaX: 24, sigmaY: 24),
-        child: Container(
-          decoration: BoxDecoration(
-            color: glass,
-            borderRadius: BorderRadius.circular(20),
-            border: Border.all(color: border, width: 0.8)),
-          child: Column(crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
+    return Container(
+      decoration: BoxDecoration(
+        border: Border(bottom: BorderSide(
+          color: border, width: 0.5))),
+      child: Column(crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
 
-            // User header
-            Padding(padding: const EdgeInsets.fromLTRB(12, 10, 12, 8),
+            // User header — compact, Instagram style
+            Padding(padding: const EdgeInsets.fromLTRB(10, 8, 10, 6),
               child: Row(children: [
                 Container(width: 30, height: 30,
                   decoration: BoxDecoration(shape: BoxShape.circle,
@@ -399,84 +392,84 @@ class _PostCardState extends State<_PostCard> {
                     color: textSub, fontSize: 11)),
               ])),
 
-            // Media
-            Padding(padding: const EdgeInsets.symmetric(horizontal: 8),
-              child: ClipRRect(
-                borderRadius: BorderRadius.circular(16),
-                child: AspectRatio(aspectRatio: p.aspectRatio,
-                  child: Stack(fit: StackFit.expand, children: [
-                    Container(decoration: BoxDecoration(
-                        gradient: LinearGradient(
-                          begin: Alignment.topLeft,
-                          end: Alignment.bottomRight,
-                          colors: p.mediaGradient))),
-                    if (p.isVideo)
-                      Center(child: Container(width: 48, height: 48,
-                        decoration: BoxDecoration(shape: BoxShape.circle,
-                          color: Colors.black.op(0.40),
-                          border: Border.all(
-                              color: Colors.white.op(0.60), width: 1.5)),
-                        child: const Icon(Icons.play_arrow_rounded,
-                            color: Colors.white, size: 26))),
-                    Container(decoration: BoxDecoration(
-                        gradient: LinearGradient(
-                          begin: Alignment.topCenter,
-                          end: Alignment.bottomCenter,
-                          colors: [Colors.transparent,
-                            Colors.black.op(0.18)]))),
-                  ])))),
+            // Media — full width, no horizontal padding, no border radius
+            AspectRatio(aspectRatio: p.aspectRatio,
+              child: Stack(fit: StackFit.expand, children: [
+                Container(decoration: BoxDecoration(
+                    gradient: LinearGradient(
+                      begin: Alignment.topLeft,
+                      end: Alignment.bottomRight,
+                      colors: p.mediaGradient))),
+                if (p.isVideo)
+                  Center(child: Container(width: 48, height: 48,
+                    decoration: BoxDecoration(shape: BoxShape.circle,
+                      color: Colors.black.op(0.40),
+                      border: Border.all(
+                          color: Colors.white.op(0.60), width: 1.5)),
+                    child: const Icon(Icons.play_arrow_rounded,
+                        color: Colors.white, size: 26))),
+                Container(decoration: BoxDecoration(
+                    gradient: LinearGradient(
+                      begin: Alignment.topCenter,
+                      end: Alignment.bottomCenter,
+                      colors: [Colors.transparent,
+                        Colors.black.op(0.18)]))),
+              ])),
 
-            // ── Instagram-style action icons ──────────────
-            Padding(padding: const EdgeInsets.fromLTRB(10, 10, 10, 0),
+            // ── Instagram-exact action icons ──────────────
+            Padding(padding: const EdgeInsets.fromLTRB(10, 8, 10, 0),
               child: Row(children: [
 
                 // Like
                 GestureDetector(onTap: _toggleLike,
-                  child: Row(children: [
-                    AnimatedSwitcher(
-                      duration: const Duration(milliseconds: 200),
-                      transitionBuilder: (child, anim) =>
-                          ScaleTransition(scale: anim, child: child),
-                      child: SizedBox(
-                        key: ValueKey(_liked),
-                        width: 24, height: 24,
-                        child: CustomPaint(
-                          painter: _IgHeartPainter(
-                            color: _liked ? likedCol : iconCol,
-                            filled: _liked)))),
-                    const SizedBox(width: 5),
-                    Text('$_likeCount', style: TextStyle(
-                        color: textSub, fontSize: 12.5,
-                        fontWeight: FontWeight.w500)),
-                  ])),
+                  child: AnimatedSwitcher(
+                    duration: const Duration(milliseconds: 200),
+                    transitionBuilder: (child, anim) =>
+                        ScaleTransition(scale: anim, child: child),
+                    child: SizedBox(
+                      key: ValueKey(_liked),
+                      width: 26, height: 26,
+                      child: CustomPaint(
+                        painter: _IgHeartPainter(
+                          color: _liked ? likedCol : iconCol,
+                          filled: _liked))))),
 
-                const SizedBox(width: 18),
+                const SizedBox(width: 16),
 
                 // Comment
                 GestureDetector(
                   onTap: () => HapticFeedback.lightImpact(),
-                  child: Row(children: [
-                    SizedBox(width: 24, height: 24,
-                      child: CustomPaint(
-                          painter: _IgCommentPainter(color: iconCol))),
-                    const SizedBox(width: 5),
-                    Text('${p.comments}', style: TextStyle(
-                        color: textSub, fontSize: 12.5,
-                        fontWeight: FontWeight.w500)),
-                  ])),
+                  child: SizedBox(width: 26, height: 26,
+                    child: CustomPaint(
+                        painter: _IgCommentPainter(color: iconCol)))),
 
-                const Spacer(),
+                const SizedBox(width: 16),
 
                 // Share / Send
                 GestureDetector(
                   onTap: () => HapticFeedback.lightImpact(),
-                  child: SizedBox(width: 24, height: 24,
+                  child: SizedBox(width: 26, height: 26,
                     child: CustomPaint(
                         painter: _IgSharePainter(color: iconCol)))),
+
+                const Spacer(),
+
+                // Bookmark (save) — Instagram right side
+                GestureDetector(
+                  onTap: () => HapticFeedback.lightImpact(),
+                  child: SizedBox(width: 26, height: 26,
+                    child: CustomPaint(
+                        painter: _IgBookmarkPainter(color: iconCol)))),
               ])),
 
+            // Like count + description
+            Padding(padding: const EdgeInsets.fromLTRB(10, 6, 10, 0),
+              child: Text('$_likeCount likes', style: TextStyle(
+                  color: textPrimary, fontSize: 13,
+                  fontWeight: FontWeight.w600))),
+
             // Description
-            Padding(padding: const EdgeInsets.fromLTRB(12, 8, 12, 12),
+            Padding(padding: const EdgeInsets.fromLTRB(10, 4, 10, 10),
               child: GestureDetector(
                 onTap: () {
                   setState(() => _expanded = !_expanded);
@@ -487,29 +480,34 @@ class _PostCardState extends State<_PostCard> {
                   curve: Curves.easeOutCubic,
                   alignment: Alignment.topCenter,
                   child: _expanded
-                      ? Text(p.description, style: TextStyle(
-                          color: textPrimary.op(0.80),
-                          fontSize: 12.5, height: 1.5))
-                      : Row(crossAxisAlignment: CrossAxisAlignment.end,
-                          children: [
-                            Expanded(child: Text(p.description,
-                              maxLines: 1,
-                              overflow: TextOverflow.ellipsis,
-                              style: TextStyle(color: textPrimary.op(0.80),
-                                  fontSize: 12.5, height: 1.5))),
-                            const SizedBox(width: 4),
-                            Text('more', style: TextStyle(color: textSub,
-                                fontSize: 12, fontWeight: FontWeight.w600)),
+                      ? Text.rich(TextSpan(children: [
+                          TextSpan(text: '${p.user} ', style: TextStyle(
+                              color: textPrimary, fontSize: 13,
+                              fontWeight: FontWeight.w600)),
+                          TextSpan(text: p.description, style: TextStyle(
+                              color: textPrimary.op(0.85),
+                              fontSize: 13, height: 1.45)),
+                        ]))
+                      : Text.rich(
+                          TextSpan(children: [
+                            TextSpan(text: '${p.user} ', style: TextStyle(
+                                color: textPrimary, fontSize: 13,
+                                fontWeight: FontWeight.w600)),
+                            TextSpan(text: p.description, style: TextStyle(
+                                color: textPrimary.op(0.85),
+                                fontSize: 13, height: 1.45)),
                           ]),
+                          maxLines: 2,
+                          overflow: TextOverflow.ellipsis,
+                        )
                 ))),
-          ]),
-        ),
-      ),
-    );
+
+          ])
+      );
   }
 }
 
-// ─── Instagram Heart ─────────────────────────────────
+// ─── Instagram Heart (exact IG proportions) ──────────
 class _IgHeartPainter extends CustomPainter {
   final Color color;
   final bool  filled;
@@ -517,45 +515,52 @@ class _IgHeartPainter extends CustomPainter {
 
   @override
   void paint(Canvas canvas, Size size) {
-    final double cx = size.width  / 2;
-    final double cy = size.height / 2 + 1;
-    final double s  = size.width  * 0.44;
+    final double w = size.width;
+    final double h = size.height;
+    // Normalize to 26×26 reference grid
+    final double sx = w / 26.0;
+    final double sy = h / 26.0;
 
-    final path = Path();
-    // Start at bottom tip
-    path.moveTo(cx, cy + s * 0.75);
-    // Left curve up
-    path.cubicTo(
-      cx - s * 0.15, cy + s * 0.40,
-      cx - s,        cy - s * 0.15,
-      cx - s * 0.55, cy - s * 0.60,
-    );
-    // Left top arc
-    path.cubicTo(
-      cx - s * 0.25, cy - s * 0.95,
-      cx,            cy - s * 0.55,
-      cx,            cy - s * 0.35,
-    );
-    // Right top arc (mirror)
-    path.cubicTo(
-      cx,            cy - s * 0.55,
-      cx + s * 0.25, cy - s * 0.95,
-      cx + s * 0.55, cy - s * 0.60,
-    );
-    // Right curve down
-    path.cubicTo(
-      cx + s,        cy - s * 0.15,
-      cx + s * 0.15, cy + s * 0.40,
-      cx,            cy + s * 0.75,
-    );
-    path.close();
+    final path = Path()
+      // bottom tip
+      ..moveTo(13.0 * sx, 23.0 * sy)
+      // left side down-curve
+      ..cubicTo(
+         6.0 * sx, 19.0 * sy,
+         1.0 * sx, 14.0 * sy,
+         1.0 * sx, 9.5  * sy)
+      // left lobe
+      ..cubicTo(
+         1.0 * sx,  5.0 * sy,
+         4.5 * sx,  2.5 * sy,
+         7.5 * sx,  2.5 * sy)
+      // center dip
+      ..cubicTo(
+        10.0 * sx,  2.5 * sy,
+        12.0 * sx,  4.0 * sy,
+        13.0 * sx,  6.0 * sy)
+      // right lobe (mirror)
+      ..cubicTo(
+        14.0 * sx,  4.0 * sy,
+        16.0 * sx,  2.5 * sy,
+        18.5 * sx,  2.5 * sy)
+      ..cubicTo(
+        21.5 * sx,  2.5 * sy,
+        25.0 * sx,  5.0 * sy,
+        25.0 * sx,  9.5 * sy)
+      // right side down-curve
+      ..cubicTo(
+        25.0 * sx, 14.0 * sy,
+        20.0 * sx, 19.0 * sy,
+        13.0 * sx, 23.0 * sy)
+      ..close();
 
     if (filled) {
       canvas.drawPath(path, Paint()..color = color..style = PaintingStyle.fill);
     } else {
       canvas.drawPath(path, Paint()
         ..color = color..style = PaintingStyle.stroke
-        ..strokeWidth = 1.4..strokeCap = StrokeCap.round
+        ..strokeWidth = 1.5..strokeCap = StrokeCap.round
         ..strokeJoin = StrokeJoin.round);
     }
   }
@@ -565,42 +570,41 @@ class _IgHeartPainter extends CustomPainter {
       o.color != color || o.filled != filled;
 }
 
-// ─── Instagram Comment bubble ─────────────────────────
+// ─── Instagram Comment (speech bubble, mirrored) ──────
 class _IgCommentPainter extends CustomPainter {
   final Color color;
   const _IgCommentPainter({required this.color});
 
   @override
   void paint(Canvas canvas, Size size) {
-    final double w  = size.width;
-    final double h  = size.height;
-    final double cx = w / 2;
-    final double cy = h / 2 - 1.0;
+    final double w = size.width;
+    final double h = size.height;
+    final double sx = w / 26.0;
+    final double sy = h / 26.0;
 
     final Paint p = Paint()
       ..color = color..style = PaintingStyle.stroke
-      ..strokeWidth = 1.4..strokeCap = StrokeCap.round
+      ..strokeWidth = 1.5..strokeCap = StrokeCap.round
       ..strokeJoin = StrokeJoin.round;
 
-    // Rounded bubble body
-    const double bw = 10.5; // half width
-    const double bh =  8.0; // half height
-    const double r  =  4.5; // corner radius
-
+    // IG comment: rounded rect bubble + bottom-left tail, mirrored
     final path = Path()
-      ..moveTo(cx - bw + r, cy - bh)
-      ..lineTo(cx + bw - r, cy - bh)
-      ..quadraticBezierTo(cx + bw, cy - bh, cx + bw, cy - bh + r)
-      ..lineTo(cx + bw, cy + bh - r)
-      ..quadraticBezierTo(cx + bw, cy + bh, cx + bw - r, cy + bh)
-      // tail
-      ..lineTo(cx - 1.5, cy + bh)
-      ..quadraticBezierTo(cx - 3.5, cy + bh + 0.5, cx - 5.5, cy + bh + 5.5)
-      ..quadraticBezierTo(cx - 5.5, cy + bh + 1.0, cx - bw + r + 1.5, cy + bh)
-      ..lineTo(cx - bw + r, cy + bh)
-      ..quadraticBezierTo(cx - bw, cy + bh, cx - bw, cy + bh - r)
-      ..lineTo(cx - bw, cy - bh + r)
-      ..quadraticBezierTo(cx - bw, cy - bh, cx - bw + r, cy - bh)
+      // start top-left
+      ..moveTo(7.0 * sx, 2.5 * sy)
+      ..lineTo(19.0 * sx, 2.5 * sy)
+      ..cubicTo(22.5 * sx, 2.5 * sy, 24.5 * sx, 4.5 * sy, 24.5 * sx, 7.5 * sy)
+      ..lineTo(24.5 * sx, 15.0 * sy)
+      ..cubicTo(24.5 * sx, 18.0 * sy, 22.5 * sx, 20.0 * sy, 19.0 * sx, 20.0 * sy)
+      ..lineTo(12.0 * sx, 20.0 * sy)
+      // tail curves down to bottom-left
+      ..cubicTo(10.0 * sx, 20.0 * sy, 5.5 * sx, 22.5 * sy, 3.0 * sx, 24.0 * sy)
+      // tail curves back up
+      ..cubicTo(4.0 * sx, 21.5 * sy, 4.5 * sx, 20.0 * sy, 4.5 * sx, 18.0 * sy)
+      ..lineTo(4.5 * sx, 15.0 * sy)
+      // close left side
+      ..lineTo(1.5 * sx, 15.0 * sy)
+      ..cubicTo(1.5 * sx, 15.0 * sy, 1.5 * sx, 7.5 * sy, 1.5 * sx, 7.5 * sy)
+      ..cubicTo(1.5 * sx, 4.5 * sy, 3.5 * sx, 2.5 * sy, 7.0 * sx, 2.5 * sy)
       ..close();
 
     canvas.drawPath(path, p);
@@ -610,46 +614,74 @@ class _IgCommentPainter extends CustomPainter {
   bool shouldRepaint(_IgCommentPainter o) => o.color != color;
 }
 
-// ─── Instagram Share / Paper plane ────────────────────
+// ─── Instagram Share / DM send ────────────────────────
 class _IgSharePainter extends CustomPainter {
   final Color color;
   const _IgSharePainter({required this.color});
 
   @override
   void paint(Canvas canvas, Size size) {
-    final double w  = size.width;
-    final double h  = size.height;
+    final double w = size.width;
+    final double h = size.height;
+    final double sx = w / 26.0;
+    final double sy = h / 26.0;
 
     final Paint p = Paint()
       ..color = color..style = PaintingStyle.stroke
-      ..strokeWidth = 1.4..strokeCap = StrokeCap.round
+      ..strokeWidth = 1.5..strokeCap = StrokeCap.round
       ..strokeJoin = StrokeJoin.round;
 
-    // Paper plane: pointing upper-right, Instagram DM style
-    // Main triangle outline
+    // IG send / paper-plane: tilted triangle pointing upper-right
     final plane = Path()
-      ..moveTo(w * 0.12, h * 0.50)          // left point
-      ..lineTo(w * 0.88, h * 0.18)          // top-right tip
-      ..lineTo(w * 0.88, h * 0.82)          // bottom-right
+      ..moveTo(2.0 * sx,  23.5 * sy)   // bottom-left
+      ..lineTo(24.0 * sx,  13.0 * sy)  // right tip
+      ..lineTo(2.0 * sx,   2.5 * sy)   // top-left
+      ..lineTo(2.0 * sx,  10.0 * sy)   // inner left top
+      ..lineTo(14.0 * sx, 13.0 * sy)   // center
+      ..lineTo(2.0 * sx,  16.0 * sy)   // inner left bottom
       ..close();
-    canvas.drawPath(plane, p);
 
-    // Fold line (inner crease from left → center)
-    canvas.drawLine(
-      Offset(w * 0.12, h * 0.50),
-      Offset(w * 0.55, h * 0.50),
-      p,
-    );
-    // Fold crease top half
-    canvas.drawLine(
-      Offset(w * 0.55, h * 0.50),
-      Offset(w * 0.88, h * 0.18),
-      p,
-    );
+    canvas.drawPath(plane, p);
   }
 
   @override
   bool shouldRepaint(_IgSharePainter o) => o.color != color;
+}
+
+// ─── Instagram Bookmark / Save ────────────────────────
+class _IgBookmarkPainter extends CustomPainter {
+  final Color color;
+  const _IgBookmarkPainter({required this.color});
+
+  @override
+  void paint(Canvas canvas, Size size) {
+    final double w = size.width;
+    final double h = size.height;
+    final double sx = w / 26.0;
+    final double sy = h / 26.0;
+
+    final Paint p = Paint()
+      ..color = color..style = PaintingStyle.stroke
+      ..strokeWidth = 1.5..strokeCap = StrokeCap.round
+      ..strokeJoin = StrokeJoin.round;
+
+    // Bookmark flag shape
+    final path = Path()
+      ..moveTo(5.0 * sx, 2.5 * sy)
+      ..lineTo(21.0 * sx, 2.5 * sy)
+      ..cubicTo(22.0 * sx, 2.5 * sy, 22.5 * sx, 3.0 * sy, 22.5 * sx, 4.0 * sy)
+      ..lineTo(22.5 * sx, 23.5 * sy)
+      ..lineTo(13.0 * sx, 18.0 * sy)
+      ..lineTo(3.5 * sx, 23.5 * sy)
+      ..lineTo(3.5 * sx, 4.0 * sy)
+      ..cubicTo(3.5 * sx, 3.0 * sy, 4.0 * sx, 2.5 * sy, 5.0 * sx, 2.5 * sy)
+      ..close();
+
+    canvas.drawPath(path, p);
+  }
+
+  @override
+  bool shouldRepaint(_IgBookmarkPainter o) => o.color != color;
 }
 
 // ═════════════════════════════════════════════════════
@@ -661,7 +693,6 @@ class _StaggeredNavbar extends StatelessWidget {
   final List<Animation<double>> itemScales, itemOpacities;
   final ValueChanged<int> onTap;
   const _StaggeredNavbar({
-    super.key,
     required this.isDark, required this.activeIndex,
     required this.itemScales, required this.itemOpacities,
     required this.onTap,
@@ -750,7 +781,7 @@ class _EnvelopeIconPainter extends CustomPainter {
 }
 
 // ═════════════════════════════════════════════════════
-//  NAV ICON PAINTERS
+//  NAV ICON PAINTERS — modern minimal curved (IG-style)
 // ═════════════════════════════════════════════════════
 class _NavIconPainter extends CustomPainter {
   final int  index;
@@ -761,58 +792,89 @@ class _NavIconPainter extends CustomPainter {
   void paint(Canvas canvas, Size size) {
     final Color  base   = isDark ? Colors.white : const Color(0xFF1A1A1A);
     final Color  col    = active ? base : base.op(0.50);
-    final double sw     = active ? 1.8 : 1.6;
+    final double sw     = active ? 1.6 : 1.4;
     final Paint  stroke = Paint()..color = col..style = PaintingStyle.stroke
         ..strokeWidth = sw..strokeCap = StrokeCap.round
         ..strokeJoin = StrokeJoin.round;
-    final Paint  fill   = Paint()..color = col..style = PaintingStyle.fill;
+    // final Paint  fill   = Paint()..color = col..style = PaintingStyle.fill;
     final double w = size.width; final double h = size.height;
     final double cx = w / 2;    final double cy = h / 2;
     switch (index) {
+
+      // ── 0: Home — modern curved house outline ──
       case 0:
-        canvas.drawPath(Path()
-          ..moveTo(w * 0.05, h * 0.52)
-          ..quadraticBezierTo(cx, h * 0.02, w * 0.95, h * 0.52),
-          Paint()..color = col..style = PaintingStyle.stroke
-              ..strokeWidth = sw + 0.2..strokeCap = StrokeCap.round
-              ..strokeJoin = StrokeJoin.round);
-        canvas.drawRRect(RRect.fromRectAndRadius(
-            Rect.fromLTWH(w*0.12, h*0.50, w*0.76, h*0.46),
-            const Radius.circular(3.0)), stroke);
-        canvas.drawRRect(RRect.fromRectAndRadius(
-            Rect.fromLTWH(cx - w*0.13, h*0.64, w*0.26, h*0.32),
-            const Radius.circular(2.5)), stroke);
+        final home = Path()
+          ..moveTo(cx, h * 0.10)           // roof peak
+          ..lineTo(w * 0.90, h * 0.45)     // right eave
+          ..lineTo(w * 0.90, h * 0.82)     // right wall bottom
+          ..cubicTo(w * 0.90, h * 0.90, w * 0.85, h * 0.92, w * 0.78, h * 0.92) // bottom-right curve
+          ..lineTo(w * 0.22, h * 0.92)     // bottom edge
+          ..cubicTo(w * 0.15, h * 0.92, w * 0.10, h * 0.90, w * 0.10, h * 0.82) // bottom-left curve
+          ..lineTo(w * 0.10, h * 0.45)     // left wall top
+          ..close();
+        canvas.drawPath(home, stroke);
+        // door arch
+        final door = Path()
+          ..moveTo(cx - w * 0.10, h * 0.92)
+          ..lineTo(cx - w * 0.10, h * 0.68)
+          ..cubicTo(cx - w * 0.10, h * 0.56, cx + w * 0.10, h * 0.56, cx + w * 0.10, h * 0.68)
+          ..lineTo(cx + w * 0.10, h * 0.92);
+        canvas.drawPath(door, stroke);
         break;
+
+      // ── 1: Explore / Compass — minimal circle + needle ──
       case 1:
-        canvas.drawCircle(Offset(cx, cy), w / 2 - 1.0, stroke);
-        canvas.drawPath(Path()
-          ..moveTo(cx - 3.5, cy - 5.0)
-          ..cubicTo(cx-3.5, cy-6.0, cx+6.5, cy-1.5, cx+6.5, cy)
-          ..cubicTo(cx+6.5, cy+1.5, cx-3.5, cy+6.0, cx-3.5, cy+5.0)
-          ..close(), fill);
+        final double r = w * 0.42;
+        canvas.drawCircle(Offset(cx, cy), r, stroke);
+        // diamond / compass needle
+        final needle = Path()
+          ..moveTo(cx, cy - r * 0.50)      // top
+          ..lineTo(cx + r * 0.20, cy)      // right
+          ..lineTo(cx, cy + r * 0.50)      // bottom
+          ..lineTo(cx - r * 0.20, cy)      // left
+          ..close();
+        canvas.drawPath(needle, stroke);
         break;
+
+      // ── 2: Create / Add — rounded square + thin plus ──
       case 2:
-        canvas.drawRRect(RRect.fromRectAndRadius(
-            Rect.fromLTWH(0.8, 0.8, w - 1.6, h - 1.6),
-            const Radius.circular(6.0)), stroke);
-        canvas.drawLine(Offset(cx, cy - 5.0), Offset(cx, cy + 5.0), stroke);
-        canvas.drawLine(Offset(cx - 5.0, cy), Offset(cx + 5.0, cy), stroke);
+        final double inset = w * 0.12;
+        final rr = RRect.fromRectAndRadius(
+            Rect.fromLTWH(inset, inset, w - inset * 2, h - inset * 2),
+            Radius.circular(w * 0.25));
+        canvas.drawRRect(rr, stroke);
+        final double arm = w * 0.16;
+        canvas.drawLine(Offset(cx, cy - arm), Offset(cx, cy + arm), stroke);
+        canvas.drawLine(Offset(cx - arm, cy), Offset(cx + arm, cy), stroke);
         break;
+
+      // ── 3: Search — smooth magnifying glass ──
       case 3:
-        final double r = w * 0.265; final double ox = cx - 2.8;
-        final double oy = cy - 2.8;
+        final double r  = w * 0.30;
+        final double ox = cx - w * 0.06;
+        final double oy = cy - h * 0.06;
         canvas.drawCircle(Offset(ox, oy), r, stroke);
-        canvas.drawLine(Offset(ox + r * 0.72, oy + r * 0.72),
-          Offset(w - 1.0, h - 1.0),
+        // handle — smooth diagonal
+        final double hx = ox + r * 0.70;
+        final double hy = oy + r * 0.70;
+        canvas.drawLine(
+          Offset(hx, hy),
+          Offset(w * 0.88, h * 0.88),
           Paint()..color = col..style = PaintingStyle.stroke
-              ..strokeWidth = sw + 0.5..strokeCap = StrokeCap.round);
+              ..strokeWidth = sw + 0.3..strokeCap = StrokeCap.round);
         break;
+
+      // ── 4: Profile — minimal person outline ──
       case 4:
-        canvas.drawCircle(Offset(cx, h * 0.30), h * 0.185, fill);
-        canvas.drawPath(Path()
-          ..moveTo(w * 0.06, h - 1.0)
-          ..cubicTo(w*0.06, h*0.62, w*0.94, h*0.62, w*0.94, h - 1.0)
-          ..close(), fill);
+        // head circle
+        final double headR = w * 0.16;
+        canvas.drawCircle(Offset(cx, h * 0.30), headR, stroke);
+        // shoulders — smooth arc
+        final body = Path()
+          ..moveTo(w * 0.14, h * 0.92)
+          ..cubicTo(w * 0.14, h * 0.60, w * 0.30, h * 0.52, cx, h * 0.52)
+          ..cubicTo(w * 0.70, h * 0.52, w * 0.86, h * 0.60, w * 0.86, h * 0.92);
+        canvas.drawPath(body, stroke);
         break;
     }
   }
@@ -827,7 +889,7 @@ class _NavIconPainter extends CustomPainter {
 class _InfinityBtn extends StatefulWidget {
   final bool isDark, isOpen;
   final VoidCallback onTap;
-  const _InfinityBtn({super.key,
+  const _InfinityBtn({
       required this.isDark, required this.isOpen, required this.onTap});
   @override
   State<_InfinityBtn> createState() => _InfinityBtnState();
@@ -912,7 +974,7 @@ class _PlusPainter extends CustomPainter {
 class _Orb extends StatelessWidget {
   final Color color; final double size;
   final double? top, bottom, left, right;
-  const _Orb({super.key, required this.color, required this.size,
+  const _Orb({required this.color, required this.size,
       this.top, this.bottom, this.left, this.right});
   @override
   Widget build(BuildContext context) => Positioned(
@@ -923,33 +985,33 @@ class _Orb extends StatelessWidget {
 }
 
 // ═════════════════════════════════════════════════════
-//  TRANDIA ISLAND — glass pill, text fills island perfectly
+//  TRANDIA ISLAND — iPhone 15 Dynamic Island size
 // ═════════════════════════════════════════════════════
 class _TrandiaIsland extends StatelessWidget {
   final bool isDark;
-  const _TrandiaIsland({super.key, required this.isDark});
+  const _TrandiaIsland({required this.isDark});
   @override
   Widget build(BuildContext context) {
     final Color glass  = (isDark ? Colors.white : Colors.black).op(0.10);
     final Color border = (isDark ? Colors.white : Colors.black).op(0.18);
     final Color text   = isDark ? Colors.white : const Color(0xFF0A0A0A);
     return ClipRRect(
-      borderRadius: BorderRadius.circular(24),
+      borderRadius: BorderRadius.circular(19),
       child: BackdropFilter(
         filter: ui.ImageFilter.blur(sigmaX: 32, sigmaY: 32),
         child: Container(
-          width: 148, height: 42,
+          width: 126, height: 37,
           decoration: BoxDecoration(
             color: glass,
-            borderRadius: BorderRadius.circular(24),
+            borderRadius: BorderRadius.circular(19),
             border: Border.all(color: border, width: 0.8)),
           child: Center(
             child: Text('Trandia',
               style: TextStyle(
                 color: text,
-                fontSize: 21,
-                fontWeight: FontWeight.w800,
-                letterSpacing: 0.6,
+                fontSize: 16.5,
+                fontWeight: FontWeight.w600,
+                letterSpacing: 0.4,
                 decoration: TextDecoration.none,
               )),
           ),

@@ -4,6 +4,9 @@ import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import '../../services/fcm_service.dart';
 import '../notifications_screen.dart';
+import '../search_screen.dart';
+import '../profile_screen.dart';
+import '../chat_list_screen.dart';
 
 extension _ColorOp on Color {
   Color op(double opacity) => withOpacity(opacity);
@@ -157,6 +160,37 @@ class _HomeScreenState extends State<HomeScreen>
     _navOpen ? _navCtrl.forward(from: 0) : _navCtrl.reverse();
   }
 
+  /// Professional slide-fade push navigation.
+  void _openScreen(BuildContext context, Widget screen) {
+    HapticFeedback.selectionClick();
+    // Close nav first, then push
+    if (_navOpen) {
+      setState(() => _navOpen = false);
+      _navCtrl.reverse();
+    }
+    Navigator.of(context).push(
+      PageRouteBuilder(
+        pageBuilder: (_, animation, __) => screen,
+        transitionDuration: const Duration(milliseconds: 380),
+        reverseTransitionDuration: const Duration(milliseconds: 300),
+        transitionsBuilder: (_, animation, __, child) {
+          final curved = CurvedAnimation(
+            parent: animation,
+            curve: Curves.easeOutCubic,
+            reverseCurve: Curves.easeInCubic,
+          );
+          return SlideTransition(
+            position: Tween<Offset>(
+              begin: const Offset(0, 0.06),
+              end: Offset.zero,
+            ).animate(curved),
+            child: FadeTransition(opacity: curved, child: child),
+          );
+        },
+      ),
+    );
+  }
+
   /// Called when user taps the Dynamic Island pill.
   void _openIsland() {
     _captureIslandRect();
@@ -247,7 +281,8 @@ class _HomeScreenState extends State<HomeScreen>
           // Message icon — compact
           Align(alignment: Alignment.topRight,
             child: Padding(padding: const EdgeInsets.only(top: 10, right: 14),
-              child: GestureDetector(onTap: () {},
+              child: GestureDetector(
+                onTap: () => _openScreen(context, ChatListScreen(dark: isDark)),
                 child: SizedBox(width: 30, height: 30,
                   child: Center(child: CustomPaint(
                     size: const Size(_kIconSize, _kIconSize),
@@ -261,7 +296,11 @@ class _HomeScreenState extends State<HomeScreen>
                 child: _StaggeredNavbar(
                   isDark: isDark, activeIndex: _activeNav,
                   itemScales: _itemScales, itemOpacities: _itemOpacities,
-                  onTap: (i) => setState(() => _activeNav = i))))),
+                  onTap: (i) {
+                    setState(() => _activeNav = i);
+                    if (i == 3) _openScreen(context, SearchScreen(dark: isDark));
+                    if (i == 4) _openScreen(context, ProfileScreen(dark: isDark));
+                  })))),
 
           // Infinity button
           Positioned(bottom: 30, right: 20,

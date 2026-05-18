@@ -2,6 +2,7 @@ import 'dart:math' as math;
 import 'dart:ui' as ui;
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
+import '../../services/fcm_service.dart';
 
 extension _ColorOp on Color {
   Color op(double opacity) => withOpacity(opacity);
@@ -122,6 +123,11 @@ class _HomeScreenState extends State<HomeScreen>
               curve: Interval(start, (start + 0.30).clamp(0.0, 1.0),
                   curve: Curves.easeOut))));
     }
+
+    // Request notification permission + show queued welcome notification
+    WidgetsBinding.instance.addPostFrameCallback(
+      (_) => FcmService.setupForHomeScreen(),
+    );
   }
 
   @override

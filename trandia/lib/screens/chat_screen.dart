@@ -54,9 +54,9 @@ class ChatScreen extends StatelessWidget {
       }
     }
 
-    return Container(
-      color: dark ? GlassTokens.bgDark : GlassTokens.bgLight,
-      child: Stack(children: [
+    return Scaffold(
+      backgroundColor: dark ? GlassTokens.bgDark : GlassTokens.bgLight,
+      body: Stack(children: [
         GlassBackdrop(dark: dark),
 
         // Messages

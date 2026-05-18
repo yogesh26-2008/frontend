@@ -144,7 +144,9 @@ class GlassSurface extends StatelessWidget {
             borderRadius: BorderRadius.circular(radius),
             boxShadow: [shadow ?? GlassTokens.cardShadow(dark)],
           ),
-          child: Stack(children: [
+          child: Stack(
+            alignment: Alignment.center,
+            children: [
             // top sheen line
             Positioned(
               top: 0, left: 18, right: 18, height: 1,

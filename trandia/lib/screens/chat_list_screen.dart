@@ -68,91 +68,101 @@ class ChatListScreen extends StatelessWidget {
     final fg  = GlassTokens.fg(dark);
     final sub = GlassTokens.sub(dark);
 
-    return Container(
-      color: dark ? GlassTokens.bgDark : GlassTokens.bgLight,
-      child: Stack(children: [
+    return Scaffold(
+      backgroundColor: dark ? GlassTokens.bgDark : GlassTokens.bgLight,
+      body: Stack(children: [
         GlassBackdrop(dark: dark),
 
-        // Scrollable content under the floating chrome
-        Positioned.fill(
-          child: ListView(
-            padding: const EdgeInsets.fromLTRB(0, 232, 0, 16),
-            children: [
-              Padding(
-                padding: const EdgeInsets.fromLTRB(16, 0, 16, 8),
-                child: Text('CHATS',
-                  style: manrope(size: 11, weight: FontWeight.w700, color: sub, letterSpacing: 0.88)),
-              ),
-              ..._chats.asMap().entries.map((e) => Padding(
-                padding: const EdgeInsets.fromLTRB(10, 0, 10, 8),
-                child: _ChatRow(c: e.value, i: e.key + 1, dark: dark),
-              )),
-            ],
-          ),
-        ),
-
-        // Header pill
-        Positioned(
-          top: 10, left: 12, right: 12,
-          child: GlassHeader(
-            dark: dark,
-            child: Row(children: [
-              Text('Messages',
-                style: manrope(size: 17, weight: FontWeight.w700, color: fg, letterSpacing: -0.34)),
-              const Spacer(),
-              GlassCircleButton(dark: dark, icon: Icons.search_rounded, iconSize: 18),
-              const SizedBox(width: 6),
-              GlassCircleButton(dark: dark, icon: Icons.edit_outlined, iconSize: 18),
-            ]),
-          ),
-        ),
-
-        // Search bar
-        Positioned(
-          top: 70, left: 12, right: 12,
-          child: ClipRRect(
-            borderRadius: BorderRadius.circular(999),
-            child: BackdropFilter(
-              filter: ImageFilter.blur(sigmaX: 20, sigmaY: 20),
-              child: Container(
-                height: 42,
-                padding: const EdgeInsets.symmetric(horizontal: 16),
-                decoration: BoxDecoration(
-                  color: dark ? Colors.white.withOpacity(0.06) : Colors.white.withOpacity(0.6),
-                  border: Border.all(color: dark ? Colors.white.withOpacity(0.10) : Colors.white.withOpacity(0.95)),
-                  borderRadius: BorderRadius.circular(999),
-                ),
+        Column(
+          crossAxisAlignment: CrossAxisAlignment.stretch,
+          children: [
+            const SizedBox(height: 10),
+            
+            // Header pill
+            Padding(
+              padding: const EdgeInsets.symmetric(horizontal: 12),
+              child: GlassHeader(
+                dark: dark,
                 child: Row(children: [
-                  Icon(Icons.search_rounded, size: 18, color: sub),
-                  const SizedBox(width: 10),
-                  Text('Search messages',
-                    style: manrope(size: 14, weight: FontWeight.w500, color: sub, letterSpacing: -0.07)),
+                  Text('Messages',
+                    style: manrope(size: 17, weight: FontWeight.w700, color: fg, letterSpacing: -0.34)),
+                  const Spacer(),
+                  GlassCircleButton(dark: dark, icon: Icons.search_rounded, iconSize: 18),
+                  const SizedBox(width: 6),
+                  GlassCircleButton(dark: dark, icon: Icons.edit_outlined, iconSize: 18),
                 ]),
               ),
             ),
-          ),
-        ),
 
-        // Active now strip
-        Positioned(
-          top: 122, left: 0, right: 0,
-          child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
+            const SizedBox(height: 12),
+
+            // Search bar
             Padding(
-              padding: const EdgeInsets.fromLTRB(16, 0, 16, 6),
-              child: Text('ACTIVE NOW',
-                style: manrope(size: 11, weight: FontWeight.w700, color: sub, letterSpacing: 0.88)),
-            ),
-            SizedBox(
-              height: 84,
-              child: ListView.separated(
-                scrollDirection: Axis.horizontal,
-                padding: const EdgeInsets.symmetric(horizontal: 12),
-                itemCount: _active.length,
-                separatorBuilder: (_, __) => const SizedBox(width: 6),
-                itemBuilder: (_, i) => _ActiveAvatar(a: _active[i], i: i, dark: dark),
+              padding: const EdgeInsets.symmetric(horizontal: 12),
+              child: ClipRRect(
+                borderRadius: BorderRadius.circular(999),
+                child: BackdropFilter(
+                  filter: ImageFilter.blur(sigmaX: 20, sigmaY: 20),
+                  child: Container(
+                    height: 42,
+                    padding: const EdgeInsets.symmetric(horizontal: 16),
+                    decoration: BoxDecoration(
+                      color: dark ? Colors.white.withOpacity(0.06) : Colors.white.withOpacity(0.6),
+                      border: Border.all(color: dark ? Colors.white.withOpacity(0.10) : Colors.white.withOpacity(0.95)),
+                      borderRadius: BorderRadius.circular(999),
+                    ),
+                    child: Row(children: [
+                      Icon(Icons.search_rounded, size: 18, color: sub),
+                      const SizedBox(width: 10),
+                      Text('Search messages',
+                        style: manrope(size: 14, weight: FontWeight.w500, color: sub, letterSpacing: -0.07)),
+                    ]),
+                  ),
+                ),
               ),
             ),
-          ]),
+
+            const SizedBox(height: 10),
+
+            // Active now strip
+            Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
+              Padding(
+                padding: const EdgeInsets.fromLTRB(16, 0, 16, 6),
+                child: Text('ACTIVE NOW',
+                  style: manrope(size: 11, weight: FontWeight.w700, color: sub, letterSpacing: 0.88)),
+              ),
+              SizedBox(
+                height: 84,
+                child: ListView.separated(
+                  scrollDirection: Axis.horizontal,
+                  padding: const EdgeInsets.symmetric(horizontal: 12),
+                  itemCount: _active.length,
+                  separatorBuilder: (_, __) => const SizedBox(width: 6),
+                  itemBuilder: (_, i) => _ActiveAvatar(a: _active[i], i: i, dark: dark),
+                ),
+              ),
+            ]),
+
+            const SizedBox(height: 5),
+
+            // Scrollable content
+            Expanded(
+              child: ListView(
+                padding: const EdgeInsets.fromLTRB(0, 0, 0, 16),
+                children: [
+                  Padding(
+                    padding: const EdgeInsets.fromLTRB(16, 0, 16, 8),
+                    child: Text('CHATS',
+                      style: manrope(size: 11, weight: FontWeight.w700, color: sub, letterSpacing: 0.88)),
+                  ),
+                  ..._chats.asMap().entries.map((e) => Padding(
+                    padding: const EdgeInsets.fromLTRB(10, 0, 10, 8),
+                    child: _ChatRow(c: e.value, i: e.key + 1, dark: dark),
+                  )),
+                ],
+              ),
+            ),
+          ],
         ),
       ]),
     );

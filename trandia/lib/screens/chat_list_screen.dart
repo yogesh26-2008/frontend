@@ -10,6 +10,7 @@ import '../services/chat_service.dart';
 import '../models/chat_model.dart';
 import 'glass_common.dart';
 import 'chat_screen.dart';
+import 'search_screen.dart';
 
 class ActiveUser {
   final String name;
@@ -98,7 +99,14 @@ class _ChatListScreenState extends State<ChatListScreen> {
                   Text('Messages',
                     style: manrope(size: 17, weight: FontWeight.w700, color: fg, letterSpacing: -0.34)),
                   const Spacer(),
-                  GlassCircleButton(dark: widget.dark, icon: Icons.search_rounded, iconSize: 18),
+                  GlassCircleButton(
+                    dark: widget.dark, 
+                    icon: Icons.search_rounded, 
+                    iconSize: 18,
+                    onTap: () {
+                      Navigator.of(context).push(MaterialPageRoute(builder: (_) => SearchScreen(dark: widget.dark)));
+                    },
+                  ),
                   const SizedBox(width: 6),
                   GlassCircleButton(dark: widget.dark, icon: Icons.edit_outlined, iconSize: 18),
                 ]),
@@ -110,24 +118,29 @@ class _ChatListScreenState extends State<ChatListScreen> {
             // Search bar
             Padding(
               padding: const EdgeInsets.symmetric(horizontal: 12),
-              child: ClipRRect(
-                borderRadius: BorderRadius.circular(999),
-                child: BackdropFilter(
-                  filter: ImageFilter.blur(sigmaX: 20, sigmaY: 20),
-                  child: Container(
-                    height: 42,
-                    padding: const EdgeInsets.symmetric(horizontal: 16),
-                    decoration: BoxDecoration(
-                      color: widget.dark ? Colors.white.withOpacity(0.06) : Colors.white.withOpacity(0.6),
-                      border: Border.all(color: widget.dark ? Colors.white.withOpacity(0.10) : Colors.white.withOpacity(0.95)),
-                      borderRadius: BorderRadius.circular(999),
+              child: GestureDetector(
+                onTap: () {
+                  Navigator.of(context).push(MaterialPageRoute(builder: (_) => SearchScreen(dark: widget.dark)));
+                },
+                child: ClipRRect(
+                  borderRadius: BorderRadius.circular(999),
+                  child: BackdropFilter(
+                    filter: ImageFilter.blur(sigmaX: 20, sigmaY: 20),
+                    child: Container(
+                      height: 42,
+                      padding: const EdgeInsets.symmetric(horizontal: 16),
+                      decoration: BoxDecoration(
+                        color: widget.dark ? Colors.white.withOpacity(0.06) : Colors.white.withOpacity(0.6),
+                        border: Border.all(color: widget.dark ? Colors.white.withOpacity(0.10) : Colors.white.withOpacity(0.95)),
+                        borderRadius: BorderRadius.circular(999),
+                      ),
+                      child: Row(children: [
+                        Icon(Icons.search_rounded, size: 18, color: sub),
+                        const SizedBox(width: 10),
+                        Text('Search messages',
+                          style: manrope(size: 14, weight: FontWeight.w500, color: sub, letterSpacing: -0.07)),
+                      ]),
                     ),
-                    child: Row(children: [
-                      Icon(Icons.search_rounded, size: 18, color: sub),
-                      const SizedBox(width: 10),
-                      Text('Search messages',
-                        style: manrope(size: 14, weight: FontWeight.w500, color: sub, letterSpacing: -0.07)),
-                    ]),
                   ),
                 ),
               ),

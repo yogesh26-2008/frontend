@@ -6,7 +6,64 @@
 
 import 'dart:ui';
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
 import 'glass_common.dart';
+import '../services/auth_service.dart';
+import '../services/chat_service.dart';
+import '../models/chat_model.dart';
+import 'chat_screen.dart';
+
+Future<void> _startChat(BuildContext context, String username, bool dark) async {
+  try {
+    HapticFeedback.selectionClick();
+    showDialog(
+      context: context, 
+      barrierDismissible: false,
+      builder: (_) => const Center(child: CircularProgressIndicator())
+    );
+    
+    final convId = await ChatService().startConversation(username);
+    final convs = await ChatService().getConversations();
+    final conversation = convs.firstWhere((c) => c.id == convId);
+    final myUserId = await AuthService.getCurrentUserId();
+    
+    if (context.mounted) Navigator.of(context).pop(); // pop loading
+    
+    if (context.mounted) {
+      await Navigator.of(context).push(
+        PageRouteBuilder(
+          pageBuilder: (_, animation, __) => ChatScreen(
+            dark: dark, 
+            conversation: conversation,
+            myUserId: myUserId ?? '',
+          ),
+          transitionDuration: const Duration(milliseconds: 380),
+          reverseTransitionDuration: const Duration(milliseconds: 300),
+          transitionsBuilder: (_, animation, __, child) {
+            final curved = CurvedAnimation(
+              parent: animation,
+              curve: Curves.easeOutCubic,
+              reverseCurve: Curves.easeInCubic,
+            );
+            return SlideTransition(
+              position: Tween<Offset>(
+                begin: const Offset(1.0, 0),
+                end: Offset.zero,
+              ).animate(curved),
+              child: FadeTransition(opacity: curved, child: child),
+            );
+          },
+        ),
+      );
+    }
+  } catch (e) {
+    if (context.mounted) {
+      Navigator.of(context).pop(); // pop loading
+      ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text('Could not start chat: $e')));
+    }
+  }
+}
+
 
 // ───────────────────────────────────────────────────────────────
 // Data models
@@ -472,9 +529,15 @@ class _RecentRow extends StatelessWidget {
       );
     }
 
-    return Padding(
-      padding: const EdgeInsets.symmetric(horizontal: 4, vertical: 10),
-      child: Row(children: [
+    return GestureDetector(
+      onTap: () {
+        if (r.kind == RecentKind.user) {
+          _startChat(context, r.name, dark);
+        }
+      },
+      child: Padding(
+        padding: const EdgeInsets.symmetric(horizontal: 4, vertical: 10),
+        child: Row(children: [
         leading,
         const SizedBox(width: 12),
         Expanded(child: Column(crossAxisAlignment: CrossAxisAlignment.start, mainAxisSize: MainAxisSize.min, children: [
@@ -493,6 +556,7 @@ class _RecentRow extends StatelessWidget {
           ),
         ),
       ]),
+      ),
     );
   }
 }
@@ -507,8 +571,10 @@ class _SuggestedCard extends StatelessWidget {
   Widget build(BuildContext context) {
     final fg = GlassTokens.fg(dark);
     final sub = GlassTokens.sub(dark);
-    return SizedBox(
-      width: 132,
+    return GestureDetector(
+      onTap: () => _startChat(context, s.name, dark),
+      child: SizedBox(
+        width: 132,
       child: GlassSurface(
         dark: dark, radius: 20,
         padding: const EdgeInsets.fromLTRB(10, 14, 10, 10),
@@ -554,6 +620,7 @@ class _SuggestedCard extends StatelessWidget {
             ),
           ),
         ]),
+      ),
       ),
     );
   }

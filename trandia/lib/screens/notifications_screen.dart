@@ -99,21 +99,23 @@ class _NotificationsScreenState extends State<NotificationsScreen> {
       child: Stack(children: [
         GlassBackdrop(dark: dark),
 
-        // ── Cascade list (positioned full-bleed, padding via Stack) ──
-        Positioned.fill(
+        // ── Cascade list (positioned below header to prevent overlap) ──
+        Positioned(
+          top: 104, bottom: 0, left: 0, right: 0,
           child: AnimatedBuilder(
             animation: _scroll,
             builder: (context, _) {
               final offset = _scroll.hasClients ? _scroll.offset : 0.0;
+              final viewportHeight = MediaQuery.of(context).size.height;
               return SingleChildScrollView(
                 controller: _scroll,
-                padding: EdgeInsets.only(top: _kListStartY, bottom: 24, left: 10, right: 10),
+                padding: const EdgeInsets.only(top: _kListStartY - 104, bottom: 40, left: 10, right: 10),
                 child: SizedBox(
                   // explicit height so we can absolute-position cards inside
                   height: items.length * (_kCardHeight + _kCardGap),
                   child: Stack(clipBehavior: Clip.none, children: [
-                    for (int i = 0; i < items.length; i++)
-                      _buildCascadeCard(items[i], i, offset, dark),
+                    for (int i = items.length - 1; i >= 0; i--)
+                      _buildCascadeCard(items[i], i, offset, dark, viewportHeight),
                   ]),
                 ),
               );
@@ -165,48 +167,37 @@ class _NotificationsScreenState extends State<NotificationsScreen> {
   }
 
   /// Computes per-card transform & places each card via Positioned + Transform.
-  Widget _buildCascadeCard(NfItem item, int i, double scrollOffset, bool dark) {
+  Widget _buildCascadeCard(NfItem item, int i, double scrollOffset, bool dark, double viewportHeight) {
     final stride = _kCardHeight + _kCardGap;
-    final naturalTop = i * stride - scrollOffset;
-    final stackZone = 64.0;
+    final cardTop = i * stride;
     final card = _NfCardInner(n: item, i: i, dark: dark);
 
-    if (naturalTop >= stackZone) {
+    final screenY = _kListStartY - scrollOffset + cardTop;
+    final stackZoneScreenY = viewportHeight - 100.0;
+
+    final overage = screenY - stackZoneScreenY;
+
+    if (overage <= 0) {
       return Positioned(
-        left: 0, right: 0, top: i * stride,
+        left: 0, right: 0, top: cardTop,
         height: _kCardHeight,
         child: card,
       );
     }
 
-    // count how many cards are in stack (have naturalTop < stackZone) up to & including this index
-    int stackTotal = 0;
-    int posInStack = 0;
-    for (int k = 0; k <= i; k++) {
-      final ny = k * stride - scrollOffset;
-      if (ny < stackZone) {
-        stackTotal++;
-        if (k == i) posInStack = stackTotal - 1;
-      }
-    }
-    // include cards after this index that also fall in stack zone
-    for (int k = i + 1; k < _filtered.length; k++) {
-      final ny = k * stride - scrollOffset;
-      if (ny < stackZone) stackTotal++;
-    }
-
-    final depth = stackTotal - 1 - posInStack;
+    final double depth = overage / stride;
     if (depth >= _kMaxStack) {
       return const SizedBox.shrink();
     }
 
-    final pinY  = stackZone - depth * _kPeek - 28;     // pin slightly above stack-zone
-    final ty    = pinY - naturalTop;
+    final pinScreenY = stackZoneScreenY + depth * 14.0;
+    final pinY = pinScreenY - (_kListStartY - scrollOffset);
+    final ty = pinY - cardTop;
     final scale = 1.0 - depth * 0.05;
-    final opacity = depth == 0 ? 1.0 : (1.0 - depth * 0.28).clamp(0.0, 1.0);
+    final opacity = (1.0 - depth * 0.25).clamp(0.0, 1.0);
 
     return Positioned(
-      left: 0, right: 0, top: i * stride,
+      left: 0, right: 0, top: cardTop,
       height: _kCardHeight,
       child: Transform.translate(
         offset: Offset(0, ty),

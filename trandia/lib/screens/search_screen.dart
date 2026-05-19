@@ -183,9 +183,11 @@ class _SearchScreenState extends State<SearchScreen> {
     final fg = GlassTokens.fg(dark);
     final sub = GlassTokens.sub(dark);
 
-    return Container(
-      color: dark ? GlassTokens.bgDark : GlassTokens.bgLight,
-      child: Stack(children: [
+    return DefaultTextStyle(
+      style: const TextStyle(decoration: TextDecoration.none),
+      child: Container(
+        color: dark ? GlassTokens.bgDark : GlassTokens.bgLight,
+        child: Stack(children: [
         GlassBackdrop(dark: dark),
 
         // ── Scrollable content ────────────────────────────────
@@ -275,7 +277,8 @@ class _SearchScreenState extends State<SearchScreen> {
             ),
           ),
         ),
-      ]),
+        ]),
+      ),
     );
   }
 }

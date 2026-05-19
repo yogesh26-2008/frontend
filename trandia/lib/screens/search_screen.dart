@@ -182,6 +182,7 @@ class _SearchScreenState extends State<SearchScreen> {
     final dark = widget.dark;
     final fg = GlassTokens.fg(dark);
     final sub = GlassTokens.sub(dark);
+    final headerTop = MediaQuery.paddingOf(context).top + 8;
 
     return DefaultTextStyle(
       style: const TextStyle(decoration: TextDecoration.none),
@@ -192,7 +193,7 @@ class _SearchScreenState extends State<SearchScreen> {
 
         // ── Scrollable content ────────────────────────────────
         Positioned.fill(
-          top: 112,
+          top: headerTop + 102,
           child: ListView(
             padding: const EdgeInsets.only(bottom: 16),
             children: [
@@ -229,7 +230,7 @@ class _SearchScreenState extends State<SearchScreen> {
 
         // ── Header: back + search input ───────────────────────
         Positioned(
-          top: 10, left: 12, right: 12,
+          top: headerTop, left: 12, right: 12,
           child: SizedBox(
             height: 52,
             child: Row(children: [
@@ -254,7 +255,7 @@ class _SearchScreenState extends State<SearchScreen> {
 
         // ── Filter chips ──────────────────────────────────────
         Positioned(
-          top: 70, left: 0, right: 0,
+          top: headerTop + 60, left: 0, right: 0,
           child: SizedBox(
             height: 30,
             child: ListView.separated(
@@ -361,7 +362,7 @@ class _SearchInputPill extends StatelessWidget {
               ),
             ],
           ),
-          child: Stack(children: [
+          child: Stack(alignment: Alignment.center, children: [
             // top sheen
             Positioned(
               top: 0, left: 20, right: 20, height: 1,

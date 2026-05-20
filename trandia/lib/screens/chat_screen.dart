@@ -15,7 +15,7 @@ import '../services/chat_service.dart';
 import 'glass_common.dart';
 
 // ── Quick emoji choices ───────────────────────────────────────
-const _kQuickEmojis = ['🤍', '😂', '🥺', '✨', '🔥', '👍'];
+const _kQuickEmojis = ['❤️', '😂', '😮', '😢', '🔥', '👏', '🎉', '💯', '👍', '🥺'];
 
 class ChatScreen extends StatefulWidget {
   final bool dark;
@@ -267,32 +267,32 @@ class _ChatScreenState extends State<ChatScreen> {
         return SafeArea(
           child: Padding(
             padding: const EdgeInsets.fromLTRB(16, 0, 16, 12),
-            child: ClipRRect(
-              borderRadius: BorderRadius.circular(24),
-              child: BackdropFilter(
-                filter: ImageFilter.blur(sigmaX: 32, sigmaY: 32),
-                child: Container(
-                  decoration: BoxDecoration(
-                    color: widget.dark
-                        ? Colors.white.withOpacity(0.08)
-                        : Colors.white.withOpacity(0.80),
-                    borderRadius: BorderRadius.circular(24),
-                    border: Border.all(
-                      color: widget.dark
-                          ? Colors.white.withOpacity(0.12)
-                          : Colors.white.withOpacity(0.9),
-                    ),
-                  ),
-                  child: Column(
-                    mainAxisSize: MainAxisSize.min,
-                    children: [
-                      const SizedBox(height: 16),
-
-                      // ── Quick emoji row ─────────────────────
-                      Padding(
-                        padding: const EdgeInsets.symmetric(horizontal: 16),
+            child: Column(
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                // ── Emojis Pill ─────────────────────
+                ClipRRect(
+                  borderRadius: BorderRadius.circular(30),
+                  child: BackdropFilter(
+                    filter: ImageFilter.blur(sigmaX: 32, sigmaY: 32),
+                    child: Container(
+                      width: double.infinity,
+                      padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
+                      decoration: BoxDecoration(
+                        color: widget.dark
+                            ? Colors.white.withOpacity(0.12)
+                            : Colors.white.withOpacity(0.85),
+                        borderRadius: BorderRadius.circular(30),
+                        border: Border.all(
+                          color: widget.dark
+                              ? Colors.white.withOpacity(0.15)
+                              : Colors.black.withOpacity(0.08),
+                        ),
+                      ),
+                      child: SingleChildScrollView(
+                        scrollDirection: Axis.horizontal,
                         child: Row(
-                          mainAxisAlignment: MainAxisAlignment.spaceEvenly,
+                          mainAxisSize: MainAxisSize.min,
                           children: _kQuickEmojis.map((emoji) {
                             final alreadyReacted = (msg.reactions[emoji] ?? [])
                                 .contains(widget.myUserId);
@@ -303,68 +303,83 @@ class _ChatScreenState extends State<ChatScreen> {
                               },
                               child: AnimatedContainer(
                                 duration: const Duration(milliseconds: 180),
-                                padding: const EdgeInsets.all(10),
+                                margin: const EdgeInsets.symmetric(horizontal: 6),
+                                padding: const EdgeInsets.all(8),
                                 decoration: BoxDecoration(
                                   shape: BoxShape.circle,
                                   color: alreadyReacted
                                       ? (widget.dark
-                                          ? Colors.white.withOpacity(0.20)
-                                          : Colors.black.withOpacity(0.12))
+                                          ? Colors.white.withOpacity(0.3)
+                                          : Colors.black.withOpacity(0.15))
                                       : Colors.transparent,
                                 ),
                                 child: Text(emoji,
-                                    style: const TextStyle(fontSize: 28)),
+                                    style: const TextStyle(fontSize: 32)),
                               ),
                             );
                           }).toList(),
                         ),
                       ),
-
-                      const SizedBox(height: 12),
-                      Divider(
-                        height: 1,
-                        color: widget.dark
-                            ? Colors.white.withOpacity(0.08)
-                            : Colors.black.withOpacity(0.06),
-                      ),
-
-                      // ── Reply ────────────────────────────────
-                      _SheetTile(
-                        dark: widget.dark,
-                        icon: Icons.reply_rounded,
-                        label: 'Reply',
-                        fg: fg,
-                        onTap: () {
-                          Navigator.pop(ctx);
-                          setState(() => _replyingTo = msg);
-                        },
-                      ),
-
-                      // ── Delete (own messages only) ───────────
-                      if (isMe) ...[
-                        Divider(
-                          height: 1,
-                          indent: 56,
-                          color: widget.dark
-                              ? Colors.white.withOpacity(0.08)
-                              : Colors.black.withOpacity(0.06),
-                        ),
-                        _SheetTile(
-                          dark: widget.dark,
-                          icon: Icons.delete_outline_rounded,
-                          label: 'Delete',
-                          fg: Colors.red,
-                          onTap: () {
-                            Navigator.pop(ctx);
-                            _deleteMessage(msg.id);
-                          },
-                        ),
-                      ],
-                      const SizedBox(height: 8),
-                    ],
+                    ),
                   ),
                 ),
-              ),
+                const SizedBox(height: 12),
+                
+                // ── Options Menu ──────────────────────
+                ClipRRect(
+                  borderRadius: BorderRadius.circular(24),
+                  child: BackdropFilter(
+                    filter: ImageFilter.blur(sigmaX: 32, sigmaY: 32),
+                    child: Container(
+                      decoration: BoxDecoration(
+                        color: widget.dark
+                            ? Colors.white.withOpacity(0.08)
+                            : Colors.white.withOpacity(0.80),
+                        borderRadius: BorderRadius.circular(24),
+                        border: Border.all(
+                          color: widget.dark
+                              ? Colors.white.withOpacity(0.12)
+                              : Colors.white.withOpacity(0.9),
+                        ),
+                      ),
+                      child: Column(
+                        mainAxisSize: MainAxisSize.min,
+                        children: [
+                          _SheetTile(
+                            dark: widget.dark,
+                            icon: Icons.reply_rounded,
+                            label: 'Reply',
+                            fg: fg,
+                            onTap: () {
+                              Navigator.pop(ctx);
+                              setState(() => _replyingTo = msg);
+                            },
+                          ),
+                          if (isMe) ...[
+                            Divider(
+                              height: 1,
+                              indent: 56,
+                              color: widget.dark
+                                  ? Colors.white.withOpacity(0.08)
+                                  : Colors.black.withOpacity(0.06),
+                            ),
+                            _SheetTile(
+                              dark: widget.dark,
+                              icon: Icons.delete_outline_rounded,
+                              label: 'Delete',
+                              fg: Colors.red,
+                              onTap: () {
+                                Navigator.pop(ctx);
+                                _deleteMessage(msg.id);
+                              },
+                            ),
+                          ],
+                        ],
+                      ),
+                    ),
+                  ),
+                ),
+              ],
             ),
           ),
         );
@@ -716,17 +731,17 @@ class _ReplyPreview extends StatelessWidget {
       margin: const EdgeInsets.only(bottom: 8, left: 4, right: 4),
       decoration: BoxDecoration(
         color: dark
-            ? Colors.white.withOpacity(0.08)
-            : Colors.white.withOpacity(0.9),
+            ? const Color(0xFF2E2E2E)
+            : Colors.white,
         borderRadius: BorderRadius.circular(16),
         border: Border.all(
           color: dark
-              ? Colors.white.withOpacity(0.12)
+              ? Colors.white.withOpacity(0.1)
               : Colors.black.withOpacity(0.05),
         ),
         boxShadow: [
           BoxShadow(
-            color: Colors.black.withOpacity(0.05),
+            color: Colors.black.withOpacity(0.1),
             blurRadius: 10,
             offset: const Offset(0, 4),
           )

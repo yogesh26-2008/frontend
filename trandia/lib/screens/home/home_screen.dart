@@ -751,7 +751,7 @@ class _StaggeredNavbar extends StatelessWidget {
   });
   @override
   Widget build(BuildContext context) {
-    final double navH   = 5 * _kItemH + 12.0;
+    final double navH   = 5 * _kItemH + 24.0;
     final Color  glass  = (isDark ? Colors.white : Colors.black).op(0.09);
     final Color  border = (isDark ? Colors.white : Colors.black).op(0.16);
     return FadeTransition(
@@ -963,7 +963,6 @@ class _InfinityBtnState extends State<_InfinityBtn>
   Widget build(BuildContext context) {
     final Color glass  = (widget.isDark ? Colors.white : Colors.black).op(0.09);
     final Color border = (widget.isDark ? Colors.white : Colors.black).op(0.18);
-    final Color iconC  = widget.isDark ? Colors.white : const Color(0xFF1A1A1A);
     return AnimatedBuilder(animation: _ctrl,
       builder: (_, __) => Transform.scale(scale: _scale.value,
         child: GestureDetector(
@@ -977,30 +976,17 @@ class _InfinityBtnState extends State<_InfinityBtn>
                 color: glass, border: Border.all(color: border, width: 0.9),
                 boxShadow: [BoxShadow(color: Colors.black.op(0.22),
                     blurRadius: 12, offset: const Offset(0, 4))]),
-              child: CustomPaint(painter: _InfinityPainter(color: iconC))))))));
+              child: Padding(
+                padding: const EdgeInsets.all(8),
+                child: ClipOval(
+                  child: Image.asset(
+                    'assets/icons/app_icon.png',
+                    fit: BoxFit.cover,
+                    alignment: Alignment.center,
+                  ),
+                ),
+              )))))));
   }
-}
-
-// ═════════════════════════════════════════════════════
-//  INFINITY PAINTER
-// ═════════════════════════════════════════════════════
-class _InfinityPainter extends CustomPainter {
-  final Color color;
-  const _InfinityPainter({required this.color});
-  @override
-  void paint(Canvas canvas, Size size) {
-    final double cx = size.width / 2; final double cy = size.height / 2;
-    const double a = 13.0; const double b = 7.0;
-    canvas.drawPath(Path()
-      ..moveTo(cx, cy)..cubicTo(cx+a*0.5, cy-b, cx+a, cy-b, cx+a, cy)
-      ..cubicTo(cx+a, cy+b, cx+a*0.5, cy+b, cx, cy)
-      ..cubicTo(cx-a*0.5, cy-b, cx-a, cy-b, cx-a, cy)
-      ..cubicTo(cx-a, cy+b, cx-a*0.5, cy+b, cx, cy),
-      Paint()..style = PaintingStyle.stroke..strokeWidth = 2.0
-          ..strokeCap = StrokeCap.round..strokeJoin = StrokeJoin.round
-          ..color = color.op(0.88));
-  }
-  @override bool shouldRepaint(_InfinityPainter o) => o.color != color;
 }
 
 // ═════════════════════════════════════════════════════

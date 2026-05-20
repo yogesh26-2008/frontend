@@ -26,6 +26,7 @@ class ChatService {
   DateTime? _lastTypingSent;
 
   String? _myUserId;
+  String? _localPublicKey;
   String? _localPrivateKey;
 
   Stream<ChatMessage> get messageStream => _messageCtrl.stream;
@@ -40,6 +41,7 @@ class ChatService {
 
     try {
       _myUserId = await AuthService.getCurrentUserId();
+      _localPublicKey = await CryptographyService().initKeys();
       _localPrivateKey = await CryptographyService().getLocalPrivateKey();
     } catch (e) {
       developer.log('[ChatService] Failed to load local keys: $e');
@@ -122,13 +124,15 @@ class ChatService {
 
   // ── Send helpers ─────────────────────────────────────────────
 
-  void sendMessage(String conversationId, String text, List<UserProfile> participants) {
+  Future<void> sendMessage(String conversationId, String text, List<UserProfile> participants) async {
     if (_channel == null) {
       developer.log('[ChatService] sendMessage: WS not connected');
       return;
     }
 
     try {
+      await _ensureKeysLoaded();
+
       // 1. Generate a random AES symmetric key
       final aesKey = CryptographyService().generateRandomAESKey();
 
@@ -144,6 +148,16 @@ class ChatService {
         } else {
           developer.log('[ChatService] Warning: participant ${p.username} has no public key');
         }
+      }
+
+      // Conversations opened from search can omit my own public key from the
+      // lightweight participant object. Add it so sender echoes/history decrypt.
+      if (_myUserId != null &&
+          _localPublicKey != null &&
+          _localPublicKey!.isNotEmpty &&
+          !encryptedAesKeys.containsKey(_myUserId)) {
+        encryptedAesKeys[_myUserId!] =
+            CryptographyService().encryptAESKeyWithRSA(aesKey, _localPublicKey!);
       }
 
       // 4. Send the payload over WebSocket
@@ -258,6 +272,9 @@ class ChatService {
     if (_myUserId == null) {
       _myUserId = await AuthService.getCurrentUserId();
     }
+    if (_localPublicKey == null) {
+      _localPublicKey = await CryptographyService().initKeys();
+    }
     if (_localPrivateKey == null) {
       _localPrivateKey = await CryptographyService().getLocalPrivateKey();
     }
@@ -273,21 +290,13 @@ class ChatService {
 
     if (myId == null || myPrivKey == null) {
       developer.log('[ChatService] Cannot decrypt message: user ID or local private key is null');
-      return msg;
+      return _hiddenEncryptedMessage(msg);
     }
 
     final encAesKey = msg.encryptedAesKeys[myId];
     if (encAesKey == null) {
       developer.log('[ChatService] Cannot decrypt message: no encrypted AES key found for current user $myId');
-      return ChatMessage(
-        id: msg.id,
-        conversationId: msg.conversationId,
-        senderId: msg.senderId,
-        text: '🔒 [Decryption error: Key not found for this device]',
-        createdAt: msg.createdAt,
-        readBy: msg.readBy,
-        encryptedAesKeys: msg.encryptedAesKeys,
-      );
+      return _hiddenEncryptedMessage(msg);
     }
 
     try {
@@ -304,16 +313,20 @@ class ChatService {
       );
     } catch (e) {
       developer.log('[ChatService] Decryption error: $e');
-      return ChatMessage(
-        id: msg.id,
-        conversationId: msg.conversationId,
-        senderId: msg.senderId,
-        text: '🔒 [Decryption error: Failed to decrypt message]',
-        createdAt: msg.createdAt,
-        readBy: msg.readBy,
-        encryptedAesKeys: msg.encryptedAesKeys,
-      );
+      return _hiddenEncryptedMessage(msg);
     }
+  }
+
+  ChatMessage _hiddenEncryptedMessage(ChatMessage msg) {
+    return ChatMessage(
+      id: msg.id,
+      conversationId: msg.conversationId,
+      senderId: msg.senderId,
+      text: '',
+      createdAt: msg.createdAt,
+      readBy: msg.readBy,
+      encryptedAesKeys: msg.encryptedAesKeys,
+    );
   }
 
   String? decryptLastMessage(String? lastMessage, Map<String, String> encryptedAesKeys) {
@@ -344,6 +357,7 @@ class ChatService {
 
   void clearCachedKeys() {
     _myUserId = null;
+    _localPublicKey = null;
     _localPrivateKey = null;
   }
 

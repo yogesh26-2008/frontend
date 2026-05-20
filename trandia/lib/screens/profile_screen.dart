@@ -103,17 +103,18 @@ class _ProfileScreenState extends State<ProfileScreen> {
     final muted = dark ? Colors.white.withOpacity(0.72) : Colors.black.withOpacity(0.72);
     final hairline = dark ? Colors.white.withOpacity(0.08) : Colors.black.withOpacity(0.06);
 
-    return Container(
-      color: dark ? GlassTokens.bgDark : GlassTokens.bgLight,
-      child: Stack(children: [
-        GlassBackdrop(dark: dark),
-
-        // ── Scroll area ───────────────────────────────────────
-        Positioned.fill(
-          child: ListView(
-            padding: const EdgeInsets.only(top: 64, bottom: 16),
-            children: [
-              // COVER BAND
+    return Scaffold(
+      backgroundColor: dark ? GlassTokens.bgDark : GlassTokens.bgLight,
+      body: Center(
+        child: SingleChildScrollView(
+          child: DefaultTextStyle(
+            style: const TextStyle(
+              decoration: TextDecoration.none,
+            ),
+            child: Column(
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                // COVER BAND
               Padding(
                 padding: const EdgeInsets.symmetric(horizontal: 12),
                 child: _CoverBand(dark: dark),
@@ -221,103 +222,12 @@ class _ProfileScreenState extends State<ProfileScreen> {
                 ),
               ),
 
-              // STATS CARD
-              Padding(
-                padding: const EdgeInsets.fromLTRB(16, 20, 16, 0),
-                child: _StatsCard(dark: dark, fg: fg, sub: sub, hairline: hairline),
-              ),
-
-              // CTAs
-              Padding(
-                padding: const EdgeInsets.fromLTRB(16, 16, 16, 0),
-                child: Row(children: [
-                  Expanded(child: _PrimaryCta(dark: dark, label: 'Follow')),
-                  const SizedBox(width: 8),
-                  Expanded(child: _GhostCta(dark: dark, label: 'Message')),
-                  const SizedBox(width: 8),
-                  _CircleGlassBtn(
-                    dark: dark,
-                    size: 44,
-                    child: Icon(Icons.ios_share_rounded, size: 18, color: fg),
-                  ),
-                ]),
-              ),
-
-              // HIGHLIGHTS
-              Padding(
-                padding: const EdgeInsets.only(top: 22),
-                child: _HighlightsRow(dark: dark, sub: sub, muted: muted),
-              ),
-
-              // TABS
-              Padding(
-                padding: const EdgeInsets.fromLTRB(12, 22, 12, 0),
-                child: _TabsPill(
-                  dark: dark,
-                  active: _tab,
-                  muted: muted,
-                  onChange: (t) => setState(() => _tab = t),
-                ),
-              ),
-
-              // GRID
-              Padding(
-                padding: const EdgeInsets.fromLTRB(12, 12, 12, 0),
-                child: _ProfileGrid(dark: dark, tiles: _tiles),
-              ),
-
-              const SizedBox(height: 12),
-            ],
+                const SizedBox(height: 16),
+              ],
+            ),
           ),
         ),
-
-        // ── Top bar ───────────────────────────────────────────
-        Positioned(
-          top: 10,
-          left: 12,
-          right: 12,
-          child: SizedBox(
-            height: 44,
-            child: Row(children: [
-              _CircleGlassBtn(
-                dark: dark,
-                size: 38,
-                child: Icon(Icons.arrow_back_ios_new_rounded, size: 18, color: fg),
-                onTap: () => Navigator.of(context).maybePop(),
-              ),
-              Expanded(
-                child: Row(
-                  mainAxisAlignment: MainAxisAlignment.center,
-                  children: [
-                    Text(
-                      'sarah.d',
-                      style: manrope(
-                        size: 14,
-                        weight: FontWeight.w700,
-                        color: fg,
-                        letterSpacing: -0.14,
-                      ),
-                    ),
-                    const SizedBox(width: 5),
-                    Icon(Icons.verified_rounded, size: 14, color: fg),
-                  ],
-                ),
-              ),
-              _CircleGlassBtn(
-                dark: dark,
-                size: 38,
-                child: Icon(Icons.ios_share_rounded, size: 18, color: fg),
-              ),
-              const SizedBox(width: 8),
-              _CircleGlassBtn(
-                dark: dark,
-                size: 38,
-                child: Icon(Icons.more_vert_rounded, size: 18, color: fg),
-              ),
-            ]),
-          ),
-        ),
-      ]),
+      ),
     );
   }
 }

@@ -126,8 +126,8 @@ class _ChatScreenState extends State<ChatScreen> {
     _textController.clear();
     HapticFeedback.lightImpact();
 
-    // Send via WebSocket
-    ChatService().sendMessage(widget.conversation.id, text);
+    // Send via WebSocket with E2EE participants
+    ChatService().sendMessage(widget.conversation.id, text, widget.conversation.participants);
   }
 
   void _onTyping(String text) {
@@ -332,9 +332,26 @@ class _ChatScreenState extends State<ChatScreen> {
                               color: fg,
                               letterSpacing: -0.225)),
                       const SizedBox(height: 2),
-                      Text(
-                        ChatService().isConnected ? 'Active now' : 'Connecting…',
-                        style: manrope(size: 11, weight: FontWeight.w500, color: sub),
+                      Row(
+                        children: [
+                          Text(
+                            ChatService().isConnected ? 'Active now' : 'Connecting…',
+                            style: manrope(size: 11, weight: FontWeight.w500, color: sub),
+                          ),
+                          const SizedBox(width: 6),
+                          Container(
+                            width: 3,
+                            height: 3,
+                            decoration: BoxDecoration(shape: BoxShape.circle, color: sub),
+                          ),
+                          const SizedBox(width: 6),
+                          Icon(Icons.lock_outline_rounded, size: 10, color: sub),
+                          const SizedBox(width: 2),
+                          Text(
+                            'E2EE',
+                            style: manrope(size: 9.5, weight: FontWeight.w700, color: sub, letterSpacing: 0.5),
+                          ),
+                        ],
                       ),
                     ]),
               ),
@@ -480,6 +497,10 @@ class _Bubble extends StatelessWidget {
                             weight: FontWeight.w500,
                             color: sub,
                             letterSpacing: -0.05)),
+                    if (m.encryptedAesKeys.isNotEmpty) ...[
+                      const SizedBox(width: 4),
+                      Icon(Icons.lock_rounded, size: 9, color: sub.withOpacity(0.6)),
+                    ],
                     if (isMe) ...[
                       const SizedBox(width: 5),
                       Icon(

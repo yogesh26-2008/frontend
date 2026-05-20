@@ -5,17 +5,10 @@ import 'package:web_socket_channel/web_socket_channel.dart';
 import 'package:http/http.dart' as http;
 import '../models/chat_model.dart';
 import 'api_service.dart';
+import 'cryptography_service.dart';
+import 'auth_service.dart';
 
 /// Singleton chat service — WebSocket + REST.
-///
-/// BUGS FIXED:
-/// 1. getConversations() had a broken ApiService.get() call at the top that
-///    ALWAYS threw TypeError (API returns a List, ApiService.get casts to Map).
-///    The custom http.get below it NEVER ran. Chat list was always empty.
-/// 2. No WebSocket auto-reconnect — dropped connections broke chat forever.
-/// 3. No timeout on HTTP calls — could hang indefinitely.
-/// 4. Typing events sent on every keystroke — WebSocket spam.
-///    Now throttled to once per 2 seconds via sendTyping().
 class ChatService {
   static final ChatService _instance = ChatService._internal();
   factory ChatService() => _instance;
@@ -32,6 +25,9 @@ class ChatService {
   // Typing throttle — only send 1 event per 2 seconds
   DateTime? _lastTypingSent;
 
+  String? _myUserId;
+  String? _localPrivateKey;
+
   Stream<ChatMessage> get messageStream => _messageCtrl.stream;
   Stream<Map<String, dynamic>> get typingStream => _typingCtrl.stream;
   bool get isConnected => _channel != null;
@@ -41,6 +37,13 @@ class ChatService {
   Future<void> connectWebSocket() async {
     if (_channel != null || _isConnecting) return;
     _isConnecting = true;
+
+    try {
+      _myUserId = await AuthService.getCurrentUserId();
+      _localPrivateKey = await CryptographyService().getLocalPrivateKey();
+    } catch (e) {
+      developer.log('[ChatService] Failed to load local keys: $e');
+    }
 
     final token = await ApiService.getToken();
     if (token == null) { _isConnecting = false; return; }
@@ -76,7 +79,8 @@ class ChatService {
       final data = jsonDecode(raw as String) as Map<String, dynamic>;
       final type = data['type'] as String?;
       if (type == 'message') {
-        final msg = ChatMessage.fromJson(data['message'] as Map<String, dynamic>);
+        var msg = ChatMessage.fromJson(data['message'] as Map<String, dynamic>);
+        msg = decryptMessage(msg);
         _messageCtrl.add(msg);
       } else if (type == 'typing') {
         _typingCtrl.add({
@@ -118,16 +122,40 @@ class ChatService {
 
   // ── Send helpers ─────────────────────────────────────────────
 
-  void sendMessage(String conversationId, String text) {
+  void sendMessage(String conversationId, String text, List<UserProfile> participants) {
     if (_channel == null) {
       developer.log('[ChatService] sendMessage: WS not connected');
       return;
     }
-    _channel!.sink.add(jsonEncode({
-      'type': 'message',
-      'conversation_id': conversationId,
-      'text': text,
-    }));
+
+    try {
+      // 1. Generate a random AES symmetric key
+      final aesKey = CryptographyService().generateRandomAESKey();
+
+      // 2. Encrypt the plaintext text with the AES key
+      final encryptedText = CryptographyService().encryptAES(text, aesKey);
+
+      // 3. Encrypt the AES key with each participant's public key
+      final Map<String, String> encryptedAesKeys = {};
+      for (final p in participants) {
+        if (p.publicKey != null && p.publicKey!.isNotEmpty) {
+          final encKey = CryptographyService().encryptAESKeyWithRSA(aesKey, p.publicKey!);
+          encryptedAesKeys[p.id] = encKey;
+        } else {
+          developer.log('[ChatService] Warning: participant ${p.username} has no public key');
+        }
+      }
+
+      // 4. Send the payload over WebSocket
+      _channel!.sink.add(jsonEncode({
+        'type': 'message',
+        'conversation_id': conversationId,
+        'text': encryptedText,
+        'encrypted_aes_keys': encryptedAesKeys,
+      }));
+    } catch (e) {
+      developer.log('[ChatService] Error encrypting and sending message: $e');
+    }
   }
 
   /// Throttled — sends at most 1 typing event per 2 seconds.
@@ -170,9 +198,21 @@ class ChatService {
 
     if (res.statusCode == 200) {
       final List data = jsonDecode(res.body) as List;
-      return data
-          .map((e) => ChatConversation.fromJson(e as Map<String, dynamic>))
-          .toList();
+      await _ensureKeysLoaded();
+      return data.map((e) {
+        final conv = ChatConversation.fromJson(e as Map<String, dynamic>);
+        final decryptedText = decryptLastMessage(conv.lastMessage, conv.lastMessageEncryptedAesKeys);
+        return ChatConversation(
+          id: conv.id,
+          participants: conv.participants,
+          lastMessage: decryptedText,
+          lastMessageTime: conv.lastMessageTime,
+          unreadCounts: conv.unreadCounts,
+          isGroup: conv.isGroup,
+          name: conv.name,
+          lastMessageEncryptedAesKeys: conv.lastMessageEncryptedAesKeys,
+        );
+      }).toList();
     } else if (res.statusCode == 401) {
       await ApiService.clearToken();
       throw const ApiException('Session expired. Please sign in again.');
@@ -197,8 +237,12 @@ class ChatService {
 
     if (res.statusCode == 200) {
       final List data = jsonDecode(res.body) as List;
+      await _ensureKeysLoaded();
       return data
-          .map((e) => ChatMessage.fromJson(e as Map<String, dynamic>))
+          .map((e) {
+            final msg = ChatMessage.fromJson(e as Map<String, dynamic>);
+            return decryptMessage(msg);
+          })
           .toList();
     } else if (res.statusCode == 401) {
       await ApiService.clearToken();
@@ -206,6 +250,101 @@ class ChatService {
     } else {
       throw ApiException('Failed to load messages (${res.statusCode})');
     }
+  }
+
+  // ── Cryptography and Key Cache Helpers ───────────────────────────
+
+  Future<void> _ensureKeysLoaded() async {
+    if (_myUserId == null) {
+      _myUserId = await AuthService.getCurrentUserId();
+    }
+    if (_localPrivateKey == null) {
+      _localPrivateKey = await CryptographyService().getLocalPrivateKey();
+    }
+  }
+
+  ChatMessage decryptMessage(ChatMessage msg) {
+    if (msg.encryptedAesKeys.isEmpty) {
+      return msg;
+    }
+
+    final myId = _myUserId;
+    final myPrivKey = _localPrivateKey;
+
+    if (myId == null || myPrivKey == null) {
+      developer.log('[ChatService] Cannot decrypt message: user ID or local private key is null');
+      return msg;
+    }
+
+    final encAesKey = msg.encryptedAesKeys[myId];
+    if (encAesKey == null) {
+      developer.log('[ChatService] Cannot decrypt message: no encrypted AES key found for current user $myId');
+      return ChatMessage(
+        id: msg.id,
+        conversationId: msg.conversationId,
+        senderId: msg.senderId,
+        text: '🔒 [Decryption error: Key not found for this device]',
+        createdAt: msg.createdAt,
+        readBy: msg.readBy,
+        encryptedAesKeys: msg.encryptedAesKeys,
+      );
+    }
+
+    try {
+      final aesKey = CryptographyService().decryptAESKeyWithRSA(encAesKey, myPrivKey);
+      final plainText = CryptographyService().decryptAES(msg.text, aesKey);
+      return ChatMessage(
+        id: msg.id,
+        conversationId: msg.conversationId,
+        senderId: msg.senderId,
+        text: plainText,
+        createdAt: msg.createdAt,
+        readBy: msg.readBy,
+        encryptedAesKeys: msg.encryptedAesKeys,
+      );
+    } catch (e) {
+      developer.log('[ChatService] Decryption error: $e');
+      return ChatMessage(
+        id: msg.id,
+        conversationId: msg.conversationId,
+        senderId: msg.senderId,
+        text: '🔒 [Decryption error: Failed to decrypt message]',
+        createdAt: msg.createdAt,
+        readBy: msg.readBy,
+        encryptedAesKeys: msg.encryptedAesKeys,
+      );
+    }
+  }
+
+  String? decryptLastMessage(String? lastMessage, Map<String, String> encryptedAesKeys) {
+    if (lastMessage == null || lastMessage.isEmpty || encryptedAesKeys.isEmpty) {
+      return lastMessage;
+    }
+
+    final myId = _myUserId;
+    final myPrivKey = _localPrivateKey;
+
+    if (myId == null || myPrivKey == null) {
+      return '🔒 [Encrypted Message]';
+    }
+
+    final encAesKey = encryptedAesKeys[myId];
+    if (encAesKey == null) {
+      return '🔒 [Encrypted Message]';
+    }
+
+    try {
+      final aesKey = CryptographyService().decryptAESKeyWithRSA(encAesKey, myPrivKey);
+      return CryptographyService().decryptAES(lastMessage, aesKey);
+    } catch (e) {
+      developer.log('[ChatService] Decrypt preview error: $e');
+      return '🔒 [Encrypted Message]';
+    }
+  }
+
+  void clearCachedKeys() {
+    _myUserId = null;
+    _localPrivateKey = null;
   }
 
   Future<String> startConversation(String participantUsername) async {

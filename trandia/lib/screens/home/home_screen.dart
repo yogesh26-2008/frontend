@@ -543,7 +543,7 @@ class _PostCardState extends State<_PostCard> {
                   onTap: () => HapticFeedback.lightImpact(),
                   child: SizedBox(width: 26, height: 26,
                     child: CustomPaint(
-                        painter: _IgCommentPainter(color: iconCol)))),
+                        painter: _CommentBubblePainter(color: iconCol)))),
 
                 const SizedBox(width: 16),
 
@@ -551,8 +551,7 @@ class _PostCardState extends State<_PostCard> {
                 GestureDetector(
                   onTap: () => HapticFeedback.lightImpact(),
                   child: SizedBox(width: 26, height: 26,
-                    child: CustomPaint(
-                        painter: _IgSharePainter(color: iconCol)))),
+                    child: Icon(Icons.near_me_rounded, size: 26, color: iconCol))),
 
                 const Spacer(),
 
@@ -561,7 +560,7 @@ class _PostCardState extends State<_PostCard> {
                   onTap: () => HapticFeedback.lightImpact(),
                   child: SizedBox(width: 26, height: 26,
                     child: CustomPaint(
-                        painter: _IgBookmarkPainter(color: iconCol)))),
+                        painter: _SaveCirclePainter(color: iconCol)))),
               ])),
 
             // Like count + description
@@ -672,118 +671,71 @@ class _IgHeartPainter extends CustomPainter {
       o.color != color || o.filled != filled;
 }
 
-// ─── Instagram Comment (speech bubble, mirrored) ──────
-class _IgCommentPainter extends CustomPainter {
+class _CommentBubblePainter extends CustomPainter {
   final Color color;
-  const _IgCommentPainter({required this.color});
+  const _CommentBubblePainter({required this.color});
 
   @override
   void paint(Canvas canvas, Size size) {
-    final double w = size.width;
-    final double h = size.height;
-    final double sx = w / 26.0;
-    final double sy = h / 26.0;
-
-    final Paint p = Paint()
-      ..color = color..style = PaintingStyle.stroke
-      ..strokeWidth = 1.5..strokeCap = StrokeCap.round
-      ..strokeJoin = StrokeJoin.round;
-
-    // IG comment: rounded rect bubble + bottom-left tail, mirrored
-    final path = Path()
-      // start top-left
-      ..moveTo(7.0 * sx, 2.5 * sy)
-      ..lineTo(19.0 * sx, 2.5 * sy)
-      ..cubicTo(22.5 * sx, 2.5 * sy, 24.5 * sx, 4.5 * sy, 24.5 * sx, 7.5 * sy)
-      ..lineTo(24.5 * sx, 15.0 * sy)
-      ..cubicTo(24.5 * sx, 18.0 * sy, 22.5 * sx, 20.0 * sy, 19.0 * sx, 20.0 * sy)
-      ..lineTo(12.0 * sx, 20.0 * sy)
-      // tail curves down to bottom-left
-      ..cubicTo(10.0 * sx, 20.0 * sy, 5.5 * sx, 22.5 * sy, 3.0 * sx, 24.0 * sy)
-      // tail curves back up
-      ..cubicTo(4.0 * sx, 21.5 * sy, 4.5 * sx, 20.0 * sy, 4.5 * sx, 18.0 * sy)
-      ..lineTo(4.5 * sx, 15.0 * sy)
-      // close left side
-      ..lineTo(1.5 * sx, 15.0 * sy)
-      ..cubicTo(1.5 * sx, 15.0 * sy, 1.5 * sx, 7.5 * sy, 1.5 * sx, 7.5 * sy)
-      ..cubicTo(1.5 * sx, 4.5 * sy, 3.5 * sx, 2.5 * sy, 7.0 * sx, 2.5 * sy)
+    final sx = size.width / 26.0;
+    final sy = size.height / 26.0;
+    final bounds = Offset.zero & size;
+    final bubble = Path()
+      ..moveTo(8.0 * sx, 4.0 * sy)
+      ..lineTo(18.0 * sx, 4.0 * sy)
+      ..cubicTo(22.0 * sx, 4.0 * sy, 24.0 * sx, 7.0 * sy, 24.0 * sx, 11.0 * sy)
+      ..lineTo(24.0 * sx, 15.0 * sy)
+      ..cubicTo(24.0 * sx, 19.0 * sy, 21.0 * sx, 21.0 * sy, 17.0 * sx, 21.0 * sy)
+      ..lineTo(15.0 * sx, 21.0 * sy)
+      ..cubicTo(12.5 * sx, 21.0 * sy, 10.6 * sx, 22.0 * sy, 8.0 * sx, 24.0 * sy)
+      ..cubicTo(7.4 * sx, 24.5 * sy, 6.6 * sx, 24.0 * sy, 6.6 * sx, 23.2 * sy)
+      ..lineTo(6.6 * sx, 20.8 * sy)
+      ..cubicTo(3.6 * sx, 19.9 * sy, 2.0 * sx, 17.3 * sy, 2.0 * sx, 14.0 * sy)
+      ..lineTo(2.0 * sx, 11.0 * sy)
+      ..cubicTo(2.0 * sx, 7.0 * sy, 4.0 * sx, 4.0 * sy, 8.0 * sx, 4.0 * sy)
       ..close();
 
-    canvas.drawPath(path, p);
+    canvas.saveLayer(bounds, Paint());
+    canvas.drawPath(bubble, Paint()..color = color);
+    final clear = Paint()..blendMode = BlendMode.clear;
+    for (final cx in [9.5, 13.0, 16.5]) {
+      canvas.drawCircle(Offset(cx * sx, 13.0 * sy), 1.6 * sx, clear);
+    }
+    canvas.restore();
   }
 
   @override
-  bool shouldRepaint(_IgCommentPainter o) => o.color != color;
-}
-
-// ─── Instagram Share / DM send ────────────────────────
-class _IgSharePainter extends CustomPainter {
-  final Color color;
-  const _IgSharePainter({required this.color});
-
-  @override
-  void paint(Canvas canvas, Size size) {
-    final double w = size.width;
-    final double h = size.height;
-    final double sx = w / 26.0;
-    final double sy = h / 26.0;
-
-    final Paint p = Paint()
-      ..color = color..style = PaintingStyle.stroke
-      ..strokeWidth = 1.5..strokeCap = StrokeCap.round
-      ..strokeJoin = StrokeJoin.round;
-
-    // IG send / paper-plane: tilted triangle pointing upper-right
-    final plane = Path()
-      ..moveTo(2.0 * sx,  23.5 * sy)   // bottom-left
-      ..lineTo(24.0 * sx,  13.0 * sy)  // right tip
-      ..lineTo(2.0 * sx,   2.5 * sy)   // top-left
-      ..lineTo(2.0 * sx,  10.0 * sy)   // inner left top
-      ..lineTo(14.0 * sx, 13.0 * sy)   // center
-      ..lineTo(2.0 * sx,  16.0 * sy)   // inner left bottom
-      ..close();
-
-    canvas.drawPath(plane, p);
-  }
-
-  @override
-  bool shouldRepaint(_IgSharePainter o) => o.color != color;
+  bool shouldRepaint(_CommentBubblePainter o) => o.color != color;
 }
 
 // ─── Instagram Bookmark / Save ────────────────────────
-class _IgBookmarkPainter extends CustomPainter {
+class _SaveCirclePainter extends CustomPainter {
   final Color color;
-  const _IgBookmarkPainter({required this.color});
+  const _SaveCirclePainter({required this.color});
 
   @override
   void paint(Canvas canvas, Size size) {
-    final double w = size.width;
-    final double h = size.height;
-    final double sx = w / 26.0;
-    final double sy = h / 26.0;
+    final sx = size.width / 26.0;
+    final sy = size.height / 26.0;
 
-    final Paint p = Paint()
-      ..color = color..style = PaintingStyle.stroke
-      ..strokeWidth = 1.5..strokeCap = StrokeCap.round
-      ..strokeJoin = StrokeJoin.round;
-
-    // Bookmark flag shape
-    final path = Path()
-      ..moveTo(5.0 * sx, 2.5 * sy)
-      ..lineTo(21.0 * sx, 2.5 * sy)
-      ..cubicTo(22.0 * sx, 2.5 * sy, 22.5 * sx, 3.0 * sy, 22.5 * sx, 4.0 * sy)
-      ..lineTo(22.5 * sx, 23.5 * sy)
-      ..lineTo(13.0 * sx, 18.0 * sy)
-      ..lineTo(3.5 * sx, 23.5 * sy)
-      ..lineTo(3.5 * sx, 4.0 * sy)
-      ..cubicTo(3.5 * sx, 3.0 * sy, 4.0 * sx, 2.5 * sy, 5.0 * sx, 2.5 * sy)
+    final bookmark = Path()
+      ..moveTo(7.0 * sx, 3.2 * sy)
+      ..lineTo(19.0 * sx, 3.2 * sy)
+      ..cubicTo(20.7 * sx, 3.2 * sy, 22.0 * sx, 4.5 * sy, 22.0 * sx, 6.2 * sy)
+      ..lineTo(22.0 * sx, 21.0 * sy)
+      ..cubicTo(22.0 * sx, 22.6 * sy, 20.2 * sx, 23.4 * sy, 19.0 * sx, 22.2 * sy)
+      ..lineTo(13.0 * sx, 16.6 * sy)
+      ..lineTo(7.0 * sx, 22.2 * sy)
+      ..cubicTo(5.8 * sx, 23.4 * sy, 4.0 * sx, 22.6 * sy, 4.0 * sx, 21.0 * sy)
+      ..lineTo(4.0 * sx, 6.2 * sy)
+      ..cubicTo(4.0 * sx, 4.5 * sy, 5.3 * sx, 3.2 * sy, 7.0 * sx, 3.2 * sy)
       ..close();
 
-    canvas.drawPath(path, p);
+    canvas.drawPath(bookmark, Paint()..color = color);
   }
 
   @override
-  bool shouldRepaint(_IgBookmarkPainter o) => o.color != color;
+  bool shouldRepaint(_SaveCirclePainter o) => o.color != color;
 }
 
 // ═════════════════════════════════════════════════════
@@ -801,7 +753,7 @@ class _StaggeredNavbar extends StatelessWidget {
   });
   @override
   Widget build(BuildContext context) {
-    final double navH   = 5 * _kItemH + 12.0;
+    final double navH   = 5 * _kItemH + 24.0;
     final Color  glass  = (isDark ? Colors.white : Colors.black).op(0.09);
     final Color  border = (isDark ? Colors.white : Colors.black).op(0.16);
     return FadeTransition(
@@ -1013,7 +965,6 @@ class _InfinityBtnState extends State<_InfinityBtn>
   Widget build(BuildContext context) {
     final Color glass  = (widget.isDark ? Colors.white : Colors.black).op(0.09);
     final Color border = (widget.isDark ? Colors.white : Colors.black).op(0.18);
-    final Color iconC  = widget.isDark ? Colors.white : const Color(0xFF1A1A1A);
     return AnimatedBuilder(animation: _ctrl,
       builder: (_, __) => Transform.scale(scale: _scale.value,
         child: GestureDetector(
@@ -1027,30 +978,17 @@ class _InfinityBtnState extends State<_InfinityBtn>
                 color: glass, border: Border.all(color: border, width: 0.9),
                 boxShadow: [BoxShadow(color: Colors.black.op(0.22),
                     blurRadius: 12, offset: const Offset(0, 4))]),
-              child: CustomPaint(painter: _InfinityPainter(color: iconC))))))));
+              child: Padding(
+                padding: const EdgeInsets.all(8),
+                child: ClipOval(
+                  child: Image.asset(
+                    'assets/icons/app_icon.png',
+                    fit: BoxFit.cover,
+                    alignment: Alignment.center,
+                  ),
+                ),
+              )))))));
   }
-}
-
-// ═════════════════════════════════════════════════════
-//  INFINITY PAINTER
-// ═════════════════════════════════════════════════════
-class _InfinityPainter extends CustomPainter {
-  final Color color;
-  const _InfinityPainter({required this.color});
-  @override
-  void paint(Canvas canvas, Size size) {
-    final double cx = size.width / 2; final double cy = size.height / 2;
-    const double a = 13.0; const double b = 7.0;
-    canvas.drawPath(Path()
-      ..moveTo(cx, cy)..cubicTo(cx+a*0.5, cy-b, cx+a, cy-b, cx+a, cy)
-      ..cubicTo(cx+a, cy+b, cx+a*0.5, cy+b, cx, cy)
-      ..cubicTo(cx-a*0.5, cy-b, cx-a, cy-b, cx-a, cy)
-      ..cubicTo(cx-a, cy+b, cx-a*0.5, cy+b, cx, cy),
-      Paint()..style = PaintingStyle.stroke..strokeWidth = 2.0
-          ..strokeCap = StrokeCap.round..strokeJoin = StrokeJoin.round
-          ..color = color.op(0.88));
-  }
-  @override bool shouldRepaint(_InfinityPainter o) => o.color != color;
 }
 
 // ═════════════════════════════════════════════════════

@@ -498,6 +498,25 @@ class _CoverBand extends StatelessWidget {
           CustomPaint(
             painter: _DiagonalStripesPainter(dark: dark),
             size: Size.infinite,
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+             
           ),
           Positioned(
             left: 18,

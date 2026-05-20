@@ -19,8 +19,9 @@ class ChatService {
   Timer? _reconnectTimer;
   int _reconnectDelay = 2; // seconds, doubles each attempt
 
-  final _messageCtrl = StreamController<ChatMessage>.broadcast();
-  final _typingCtrl  = StreamController<Map<String, dynamic>>.broadcast();
+  final _messageCtrl  = StreamController<ChatMessage>.broadcast();
+  final _typingCtrl   = StreamController<Map<String, dynamic>>.broadcast();
+  final _reactionCtrl = StreamController<Map<String, dynamic>>.broadcast();
 
   // Typing throttle — only send 1 event per 2 seconds
   DateTime? _lastTypingSent;
@@ -29,8 +30,10 @@ class ChatService {
   String? _localPublicKey;
   String? _localPrivateKey;
 
-  Stream<ChatMessage> get messageStream => _messageCtrl.stream;
-  Stream<Map<String, dynamic>> get typingStream => _typingCtrl.stream;
+  Stream<ChatMessage>            get messageStream  => _messageCtrl.stream;
+  Stream<Map<String, dynamic>>   get typingStream   => _typingCtrl.stream;
+  /// Emits: { "message_id": "...", "conversation_id": "...", "reactions": { emoji: [uids] } }
+  Stream<Map<String, dynamic>>   get reactionStream => _reactionCtrl.stream;
   bool get isConnected => _channel != null;
 
   // ── WebSocket ────────────────────────────────────────────────
@@ -80,6 +83,7 @@ class ChatService {
     try {
       final data = jsonDecode(raw as String) as Map<String, dynamic>;
       final type = data['type'] as String?;
+
       if (type == 'message') {
         var msg = ChatMessage.fromJson(data['message'] as Map<String, dynamic>);
         msg = decryptMessage(msg);
@@ -88,6 +92,18 @@ class ChatService {
         _typingCtrl.add({
           'conversation_id': data['conversation_id'],
           'user_id': data['user_id'],
+        });
+      } else if (type == 'react') {
+        // Build typed reactions map
+        final rawReactions = data['reactions'] as Map<String, dynamic>? ?? {};
+        final Map<String, List<String>> reactions = {};
+        rawReactions.forEach((emoji, users) {
+          reactions[emoji] = List<String>.from(users as List);
+        });
+        _reactionCtrl.add({
+          'message_id':      data['message_id'] as String,
+          'conversation_id': data['conversation_id'] as String,
+          'reactions':       reactions,
         });
       }
     } catch (e) {
@@ -129,6 +145,8 @@ class ChatService {
     String text,
     List<UserProfile> participants, {
     DateTime? createdAt,
+    String? replyToId,
+    String? replyToText,
   }) async {
     if (_channel == null) {
       developer.log('[ChatService] sendMessage: WS not connected');
@@ -172,10 +190,23 @@ class ChatService {
         'text': encryptedText,
         'client_created_at': (createdAt ?? DateTime.now()).toUtc().toIso8601String(),
         'encrypted_aes_keys': encryptedAesKeys,
+        if (replyToId != null) 'reply_to_id': replyToId,
+        if (replyToText != null) 'reply_to_text': replyToText,
       }));
     } catch (e) {
       developer.log('[ChatService] Error encrypting and sending message: $e');
     }
+  }
+
+  /// Send a reaction toggle over WebSocket.
+  void sendReaction(String conversationId, String messageId, String emoji) {
+    if (_channel == null) return;
+    _channel!.sink.add(jsonEncode({
+      'type':            'react',
+      'conversation_id': conversationId,
+      'message_id':      messageId,
+      'emoji':           emoji,
+    }));
   }
 
   /// Throttled — sends at most 1 typing event per 2 seconds.
@@ -311,6 +342,9 @@ class ChatService {
         createdAt: msg.createdAt,
         readBy: msg.readBy,
         encryptedAesKeys: msg.encryptedAesKeys,
+        reactions: msg.reactions,
+        replyToId: msg.replyToId,
+        replyToText: msg.replyToText,
       );
     } catch (e) {
       developer.log('[ChatService] Decryption error: $e');
@@ -339,6 +373,9 @@ class ChatService {
       createdAt: msg.createdAt,
       readBy: msg.readBy,
       encryptedAesKeys: msg.encryptedAesKeys,
+      reactions: msg.reactions,
+      replyToId: msg.replyToId,
+      replyToText: msg.replyToText,
     );
   }
 

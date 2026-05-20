@@ -90,6 +90,13 @@ class ChatMessage {
   final List<String> readBy;
   final Map<String, String> encryptedAesKeys;
 
+  /// reactions: emoji → list of user-ids who reacted
+  final Map<String, List<String>> reactions;
+
+  /// The message this is replying to (if any)
+  final String? replyToId;
+  final String? replyToText;
+
   ChatMessage({
     required this.id,
     required this.conversationId,
@@ -98,13 +105,39 @@ class ChatMessage {
     required this.createdAt,
     this.readBy = const [],
     this.encryptedAesKeys = const {},
+    this.reactions = const {},
+    this.replyToId,
+    this.replyToText,
   });
+
+  /// Returns a copy with updated reactions (for real-time WS updates).
+  ChatMessage copyWithReactions(Map<String, List<String>> newReactions) {
+    return ChatMessage(
+      id: id,
+      conversationId: conversationId,
+      senderId: senderId,
+      text: text,
+      createdAt: createdAt,
+      readBy: readBy,
+      encryptedAesKeys: encryptedAesKeys,
+      reactions: newReactions,
+      replyToId: replyToId,
+      replyToText: replyToText,
+    );
+  }
 
   factory ChatMessage.fromJson(Map<String, dynamic> json) {
     final Map<String, String> encryptedAesKeys = {};
     if (json['encrypted_aes_keys'] != null) {
       json['encrypted_aes_keys'].forEach((key, value) {
         encryptedAesKeys[key] = value as String;
+      });
+    }
+
+    final Map<String, List<String>> reactions = {};
+    if (json['reactions'] != null) {
+      (json['reactions'] as Map<String, dynamic>).forEach((emoji, users) {
+        reactions[emoji] = List<String>.from(users as List);
       });
     }
 
@@ -116,6 +149,9 @@ class ChatMessage {
       createdAt: DateTime.parse(json['created_at']).toLocal(),
       readBy: List<String>.from(json['read_by'] ?? []),
       encryptedAesKeys: encryptedAesKeys,
+      reactions: reactions,
+      replyToId: json['reply_to_id'],
+      replyToText: json['reply_to_text'],
     );
   }
 }

@@ -39,25 +39,6 @@ class UserService {
     }
   }
 
-  static Future<bool> isFollowing(String targetId) async {
-    try {
-      final token = await ApiService.getToken();
-      if (token == null) return false;
-      final res = await http.get(
-        Uri.parse('$baseUrl/users/$targetId/follow'),
-        headers: {'Authorization': 'Bearer $token'},
-      ).timeout(const Duration(seconds: 10));
-      if (res.statusCode == 200) {
-        final data = jsonDecode(res.body) as Map<String, dynamic>;
-        return data['following'] == true;
-      }
-      return false;
-    } catch (e) {
-      developer.log('isFollowing error: $e');
-      return false;
-    }
-  }
-
   // ── Search ───────────────────────────────────────────────────────────────
 
   static Future<List<UserProfile>> searchUsers(String query) async {

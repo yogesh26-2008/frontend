@@ -729,7 +729,7 @@ class _UserResultRow extends StatelessWidget {
               style: manrope(size: 11.5, weight: FontWeight.w500, color: sub, letterSpacing: -0.06)),
           ])),
           const SizedBox(width: 8),
-          _FollowButton(userId: u.id, dark: dark),
+          _FollowButton(userId: u.id, initialFollowing: u.isFollowing, dark: dark),
         ]),
       ),
     );
@@ -740,58 +740,42 @@ class _UserResultRow extends StatelessWidget {
 
 class _FollowButton extends StatefulWidget {
   final String userId;
+  final bool initialFollowing;
   final bool dark;
-  const _FollowButton({required this.userId, required this.dark});
+  const _FollowButton({required this.userId, required this.initialFollowing, required this.dark});
 
   @override
   State<_FollowButton> createState() => _FollowButtonState();
 }
 
 class _FollowButtonState extends State<_FollowButton> {
-  bool _isFollowing = false;
-  bool _loading = true; // true while checking initial status
+  late bool _isFollowing;
 
   @override
   void initState() {
     super.initState();
-    _loadStatus();
-  }
-
-  Future<void> _loadStatus() async {
-    final following = await UserService.isFollowing(widget.userId);
-    if (mounted) setState(() { _isFollowing = following; _loading = false; });
+    _isFollowing = widget.initialFollowing; // instant — no API call
   }
 
   Future<void> _toggle() async {
     final wasFollowing = _isFollowing;
-    // Optimistic update
-    setState(() { _isFollowing = !wasFollowing; _loading = true; });
-
-    final ok = wasFollowing
-        ? await UserService.unfollowUser(widget.userId)
-        : await UserService.followUser(widget.userId);
-
-    if (mounted) setState(() { _isFollowing = ok ? !wasFollowing : wasFollowing; _loading = false; });
+    setState(() => _isFollowing = !wasFollowing); // instant optimistic update
+    // fire-and-forget: UI already updated, API runs in background
+    if (wasFollowing) {
+      UserService.unfollowUser(widget.userId);
+    } else {
+      UserService.followUser(widget.userId);
+    }
   }
 
   @override
   Widget build(BuildContext context) {
     final dark = widget.dark;
     final fg = GlassTokens.fg(dark);
-
-    if (_loading) {
-      return SizedBox(
-        width: 86, height: 30,
-        child: Center(child: SizedBox(width: 14, height: 14,
-          child: CircularProgressIndicator(strokeWidth: 2,
-            color: dark ? Colors.white54 : Colors.black38))),
-      );
-    }
-
     return GestureDetector(
       onTap: _toggle,
       child: AnimatedContainer(
-        duration: const Duration(milliseconds: 200),
+        duration: const Duration(milliseconds: 150),
         padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 6),
         decoration: BoxDecoration(
           color: _isFollowing

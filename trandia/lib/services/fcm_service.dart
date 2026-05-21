@@ -23,6 +23,10 @@ bool _listenerOn  = false;
 String? _pendingTitle;
 String? _pendingBody;
 
+/// The conversation_id that the user currently has open.
+/// Notifications for this conversation are suppressed (user already sees it).
+String? _activeConversationId;
+
 /// Callback fired when a user taps a message notification.
 typedef ConversationNavigator = void Function(String conversationId);
 ConversationNavigator? _onMessageTapped;
@@ -103,6 +107,17 @@ class FcmService {
   // ─────────────────────────────────────────────────────────────────────────
   static void registerMessageTapHandler(ConversationNavigator handler) {
     _onMessageTapped = handler;
+  }
+
+  // ─────────────────────────────────────────────────────────────────────────
+  // setActiveConversation()
+  // Call from ChatScreen.initState with the conversation id being viewed.
+  // Call with null from ChatScreen.dispose when leaving the screen.
+  // Notifications for the active conversation are suppressed automatically.
+  // ─────────────────────────────────────────────────────────────────────────
+  static void setActiveConversation(String? conversationId) {
+    _activeConversationId = conversationId;
+    debugPrint('[FCM] active conversation: $conversationId');
   }
 
   // ─────────────────────────────────────────────────────────────────────────
@@ -210,7 +225,7 @@ class FcmService {
 
       if (msgType == 'welcome') return; // shown locally — suppress duplicate
 
-      // Follow notification — show with people icon
+      // Follow notification — show always
       if (msgType == 'follow') {
         final title = msg.data['title'] as String? ?? msg.notification?.title ?? 'New follower';
         final body  = msg.data['body']  as String? ?? msg.notification?.body  ?? 'started following you';
@@ -225,6 +240,13 @@ class FcmService {
           ?? (msg.data['body'] as String?)
           ?? '';
       final conversationId = msg.data['conversation_id'] as String?;
+
+      // ── Smart suppress: user is already viewing this conversation ──────────
+      if (conversationId != null &&
+          conversationId == _activeConversationId) {
+        debugPrint('[FCM] suppressed notification — user is in conversation $conversationId');
+        return;
+      }
 
       await show(title: title, body: body, conversationId: conversationId);
     });

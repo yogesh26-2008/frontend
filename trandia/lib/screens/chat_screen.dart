@@ -14,6 +14,7 @@ import 'package:flutter/services.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 import '../models/chat_model.dart';
 import '../services/chat_service.dart';
+import '../services/fcm_service.dart';
 import 'glass_common.dart';
 
 // ── Quick emoji choices ───────────────────────────────────────
@@ -54,6 +55,9 @@ class _ChatScreenState extends State<ChatScreen> {
   @override
   void initState() {
     super.initState();
+    // Tell FCM service which conversation is active so it suppresses
+    // redundant notifications while user is viewing this chat.
+    FcmService.setActiveConversation(widget.conversation.id);
     _loadMessages();
     ChatService().markAsRead(widget.conversation.id);
 
@@ -114,6 +118,8 @@ class _ChatScreenState extends State<ChatScreen> {
 
   @override
   void dispose() {
+    // Clear active conversation so notifications resume for this chat
+    FcmService.setActiveConversation(null);
     _textController.dispose();
     _scrollController.dispose();
     _messageSub.cancel();

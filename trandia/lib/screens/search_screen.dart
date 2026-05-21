@@ -516,6 +516,9 @@ class _SearchInputPillState extends State<_SearchInputPill> {
                   hintStyle: manrope(size: 14.5, weight: FontWeight.w500, color: sub, letterSpacing: -0.145),
                   border: InputBorder.none, isDense: true, contentPadding: EdgeInsets.zero,
                 ),
+                keyboardType: TextInputType.text,
+                autocorrect: false,
+                enableSuggestions: false,
               )),
               const SizedBox(width: 6),
               if (hasText)
@@ -725,7 +728,91 @@ class _UserResultRow extends StatelessWidget {
             Text('@${u.username}', maxLines: 1, overflow: TextOverflow.ellipsis,
               style: manrope(size: 11.5, weight: FontWeight.w500, color: sub, letterSpacing: -0.06)),
           ])),
+          const SizedBox(width: 8),
+          _FollowButton(userId: u.id, dark: dark),
         ]),
+      ),
+    );
+  }
+}
+
+// ── Follow Button (stateful toggle) ───────────────────────────────────────
+
+class _FollowButton extends StatefulWidget {
+  final String userId;
+  final bool dark;
+  const _FollowButton({required this.userId, required this.dark});
+
+  @override
+  State<_FollowButton> createState() => _FollowButtonState();
+}
+
+class _FollowButtonState extends State<_FollowButton> {
+  bool _isFollowing = false;
+  bool _loading = true; // true while checking initial status
+
+  @override
+  void initState() {
+    super.initState();
+    _loadStatus();
+  }
+
+  Future<void> _loadStatus() async {
+    final following = await UserService.isFollowing(widget.userId);
+    if (mounted) setState(() { _isFollowing = following; _loading = false; });
+  }
+
+  Future<void> _toggle() async {
+    final wasFollowing = _isFollowing;
+    // Optimistic update
+    setState(() { _isFollowing = !wasFollowing; _loading = true; });
+
+    final ok = wasFollowing
+        ? await UserService.unfollowUser(widget.userId)
+        : await UserService.followUser(widget.userId);
+
+    if (mounted) setState(() { _isFollowing = ok ? !wasFollowing : wasFollowing; _loading = false; });
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final dark = widget.dark;
+    final fg = GlassTokens.fg(dark);
+
+    if (_loading) {
+      return SizedBox(
+        width: 86, height: 30,
+        child: Center(child: SizedBox(width: 14, height: 14,
+          child: CircularProgressIndicator(strokeWidth: 2,
+            color: dark ? Colors.white54 : Colors.black38))),
+      );
+    }
+
+    return GestureDetector(
+      onTap: _toggle,
+      child: AnimatedContainer(
+        duration: const Duration(milliseconds: 200),
+        padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 6),
+        decoration: BoxDecoration(
+          color: _isFollowing
+              ? Colors.transparent
+              : (dark ? Colors.white : const Color(0xFF0A0A0A)),
+          borderRadius: BorderRadius.circular(999),
+          border: Border.all(
+            color: _isFollowing
+                ? (dark ? Colors.white.withOpacity(0.25) : Colors.black.withOpacity(0.18))
+                : Colors.transparent,
+          ),
+        ),
+        child: Text(
+          _isFollowing ? 'Following' : 'Follow',
+          style: manrope(
+            size: 12.5,
+            weight: FontWeight.w700,
+            color: _isFollowing ? fg : (dark ? const Color(0xFF0A0A0A) : Colors.white),
+            letterSpacing: -0.12,
+          ),
+        ),
       ),
     );
   }

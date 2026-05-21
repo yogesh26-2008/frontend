@@ -46,10 +46,7 @@ class _ChatScreenState extends State<ChatScreen> {
   late StreamSubscription<Map<String, dynamic>> _typingSub;
   late StreamSubscription<Map<String, dynamic>> _reactionSub;
 
-  // For optimistic send — track pending messages by temp id
   final Set<String> _pendingIds = {};
-
-  // Reply state
   ChatMessage? _replyingTo;
 
   @override
@@ -99,11 +96,10 @@ class _ChatScreenState extends State<ChatScreen> {
       }
     });
 
-    // Real-time reaction updates
     _reactionSub = ChatService().reactionStream.listen((event) {
       if (!mounted) return;
       if (event['conversation_id'] != widget.conversation.id) return;
-      final msgId    = event['message_id'] as String;
+      final msgId     = event['message_id'] as String;
       final reactions = event['reactions'] as Map<String, List<String>>;
       setState(() {
         final idx = _messages.indexWhere((m) => m.id == msgId);
@@ -126,17 +122,9 @@ class _ChatScreenState extends State<ChatScreen> {
   }
 
   Future<void> _loadMessages() async {
-    if (mounted) {
-      setState(() {
-        _isLoading = true;
-        _hasError = false;
-      });
-    }
+    if (mounted) setState(() { _isLoading = true; _hasError = false; });
     try {
-      final msgs = await ChatService().getMessages(
-        widget.conversation.id,
-        limit: 25,
-      );
+      final msgs = await ChatService().getMessages(widget.conversation.id, limit: 25);
       if (mounted) {
         setState(() {
           _messages = msgs.where(_isDisplayableMessage).toList();
@@ -144,12 +132,7 @@ class _ChatScreenState extends State<ChatScreen> {
         });
       }
     } catch (e) {
-      if (mounted) {
-        setState(() {
-          _isLoading = false;
-          _hasError = true;
-        });
-      }
+      if (mounted) setState(() { _isLoading = false; _hasError = true; });
     }
   }
 
@@ -173,26 +156,21 @@ class _ChatScreenState extends State<ChatScreen> {
     if (text.isEmpty) return false;
     if (text.startsWith('[Decryption error:') ||
         text.contains('Decryption error:') ||
-        text == '[Encrypted Message]') {
-      return false;
-    }
+        text == '[Encrypted Message]') return false;
     return !_looksLikeEncryptedPayload(text);
   }
 
   bool _looksLikeEncryptedPayload(String text) {
-    final normalized = text.replaceAll(RegExp(r'\s+'), '');
-    return normalized.startsWith('{"ct":') &&
-        normalized.contains('"iv":') &&
-        normalized.endsWith('}');
+    final n = text.replaceAll(RegExp(r'\s+'), '');
+    return n.startsWith('{"ct":') && n.contains('"iv":') && n.endsWith('}');
   }
 
-  /// Optimistic send: insert locally first, then fire over WS.
   void _sendMessage() {
     final text = _textController.text.trim();
     if (text.isEmpty) return;
 
-    final sentAt = DateTime.now();
-    final tempId = 'temp_${sentAt.millisecondsSinceEpoch}';
+    final sentAt  = DateTime.now();
+    final tempId  = 'temp_${sentAt.millisecondsSinceEpoch}';
     final replyTo = _replyingTo;
 
     final optimistic = ChatMessage(
@@ -216,12 +194,8 @@ class _ChatScreenState extends State<ChatScreen> {
     HapticFeedback.lightImpact();
 
     ChatService().sendMessage(
-      widget.conversation.id,
-      text,
-      widget.conversation.participants,
-      createdAt: sentAt,
-      replyToId: replyTo?.id,
-      replyToText: replyTo?.text,
+      widget.conversation.id, text, widget.conversation.participants,
+      createdAt: sentAt, replyToId: replyTo?.id, replyToText: replyTo?.text,
     );
   }
 
@@ -233,7 +207,6 @@ class _ChatScreenState extends State<ChatScreen> {
     HapticFeedback.selectionClick();
     ChatService().sendReaction(widget.conversation.id, msg.id, emoji);
 
-    // Optimistic local update
     setState(() {
       final idx = _messages.indexWhere((m) => m.id == msg.id);
       if (idx == -1) return;
@@ -252,12 +225,11 @@ class _ChatScreenState extends State<ChatScreen> {
     });
   }
 
-  /// Show the long-press action sheet
+  // ── Instagram-style emoji reaction bottom sheet ──────────────
   void _showMessageOptions(ChatMessage msg) {
     HapticFeedback.mediumImpact();
     final isMe = msg.senderId == widget.myUserId;
-    final fg  = GlassTokens.fg(widget.dark);
-    final sub = GlassTokens.sub(widget.dark);
+    final fg   = GlassTokens.fg(widget.dark);
 
     showModalBottomSheet(
       context: context,
@@ -270,51 +242,87 @@ class _ChatScreenState extends State<ChatScreen> {
             child: Column(
               mainAxisSize: MainAxisSize.min,
               children: [
-                // ── Emojis Pill ─────────────────────
+
+                // ── Instagram-style emoji pill ─────────────────
                 ClipRRect(
-                  borderRadius: BorderRadius.circular(30),
+                  borderRadius: BorderRadius.circular(50),
                   child: BackdropFilter(
-                    filter: ImageFilter.blur(sigmaX: 32, sigmaY: 32),
+                    filter: ImageFilter.blur(sigmaX: 40, sigmaY: 40),
                     child: Container(
                       width: double.infinity,
-                      padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
+                      padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
                       decoration: BoxDecoration(
                         color: widget.dark
-                            ? Colors.white.withOpacity(0.12)
-                            : Colors.white.withOpacity(0.85),
-                        borderRadius: BorderRadius.circular(30),
+                            ? const Color(0xFF1C1C1E).withOpacity(0.92)
+                            : Colors.white.withOpacity(0.96),
+                        borderRadius: BorderRadius.circular(50),
                         border: Border.all(
                           color: widget.dark
-                              ? Colors.white.withOpacity(0.15)
-                              : Colors.black.withOpacity(0.08),
+                              ? Colors.white.withOpacity(0.10)
+                              : Colors.black.withOpacity(0.06),
+                          width: 0.8,
                         ),
+                        boxShadow: [
+                          BoxShadow(
+                            color: Colors.black.withOpacity(widget.dark ? 0.5 : 0.12),
+                            blurRadius: 24,
+                            offset: const Offset(0, 8),
+                          ),
+                        ],
                       ),
                       child: SingleChildScrollView(
                         scrollDirection: Axis.horizontal,
+                        physics: const BouncingScrollPhysics(),
                         child: Row(
                           mainAxisSize: MainAxisSize.min,
                           children: _kQuickEmojis.map((emoji) {
-                            final alreadyReacted = (msg.reactions[emoji] ?? [])
-                                .contains(widget.myUserId);
+                            final alreadyReacted =
+                                (msg.reactions[emoji] ?? []).contains(widget.myUserId);
                             return GestureDetector(
                               onTap: () {
                                 Navigator.pop(ctx);
                                 _onReact(msg, emoji);
                               },
-                              child: AnimatedContainer(
-                                duration: const Duration(milliseconds: 180),
-                                margin: const EdgeInsets.symmetric(horizontal: 6),
-                                padding: const EdgeInsets.all(8),
-                                decoration: BoxDecoration(
-                                  shape: BoxShape.circle,
-                                  color: alreadyReacted
-                                      ? (widget.dark
-                                          ? Colors.white.withOpacity(0.3)
-                                          : Colors.black.withOpacity(0.15))
-                                      : Colors.transparent,
+                              child: TweenAnimationBuilder<double>(
+                                tween: Tween(begin: 1.0, end: alreadyReacted ? 1.15 : 1.0),
+                                duration: const Duration(milliseconds: 200),
+                                curve: Curves.elasticOut,
+                                builder: (_, scale, child) => Transform.scale(
+                                  scale: scale,
+                                  child: child,
                                 ),
-                                child: Text(emoji,
-                                    style: const TextStyle(fontSize: 32)),
+                                child: AnimatedContainer(
+                                  duration: const Duration(milliseconds: 180),
+                                  margin: const EdgeInsets.symmetric(horizontal: 4),
+                                  width: 48,
+                                  height: 48,
+                                  decoration: BoxDecoration(
+                                    shape: BoxShape.circle,
+                                    color: alreadyReacted
+                                        ? (widget.dark
+                                            ? Colors.white.withOpacity(0.18)
+                                            : const Color(0xFF0095F6).withOpacity(0.12))
+                                        : Colors.transparent,
+                                    border: alreadyReacted
+                                        ? Border.all(
+                                            color: widget.dark
+                                                ? Colors.white.withOpacity(0.35)
+                                                : const Color(0xFF0095F6).withOpacity(0.5),
+                                            width: 1.5,
+                                          )
+                                        : null,
+                                  ),
+                                  alignment: Alignment.center,
+                                  // High-quality emoji: no font scaling, crisp render
+                                  child: Text(
+                                    emoji,
+                                    style: const TextStyle(
+                                      fontSize: 28,
+                                      height: 1.0,
+                                      fontFamilyFallback: ['Apple Color Emoji', 'Noto Color Emoji'],
+                                    ),
+                                  ),
+                                ),
                               ),
                             );
                           }).toList(),
@@ -323,24 +331,33 @@ class _ChatScreenState extends State<ChatScreen> {
                     ),
                   ),
                 ),
-                const SizedBox(height: 12),
-                
-                // ── Options Menu ──────────────────────
+
+                const SizedBox(height: 10),
+
+                // ── Options menu ───────────────────────────────
                 ClipRRect(
                   borderRadius: BorderRadius.circular(24),
                   child: BackdropFilter(
-                    filter: ImageFilter.blur(sigmaX: 32, sigmaY: 32),
+                    filter: ImageFilter.blur(sigmaX: 40, sigmaY: 40),
                     child: Container(
                       decoration: BoxDecoration(
                         color: widget.dark
-                            ? Colors.white.withOpacity(0.08)
-                            : Colors.white.withOpacity(0.80),
+                            ? const Color(0xFF1C1C1E).withOpacity(0.92)
+                            : Colors.white.withOpacity(0.96),
                         borderRadius: BorderRadius.circular(24),
                         border: Border.all(
                           color: widget.dark
-                              ? Colors.white.withOpacity(0.12)
-                              : Colors.white.withOpacity(0.9),
+                              ? Colors.white.withOpacity(0.10)
+                              : Colors.black.withOpacity(0.06),
+                          width: 0.8,
                         ),
+                        boxShadow: [
+                          BoxShadow(
+                            color: Colors.black.withOpacity(widget.dark ? 0.5 : 0.10),
+                            blurRadius: 20,
+                            offset: const Offset(0, 6),
+                          ),
+                        ],
                       ),
                       child: Column(
                         mainAxisSize: MainAxisSize.min,
@@ -413,12 +430,12 @@ class _ChatScreenState extends State<ChatScreen> {
     try {
       await ChatService().deleteConversation(widget.conversation.id);
       if (mounted) {
-        Navigator.pop(context); // pop loading
-        Navigator.pop(context, true); // pop chat screen
+        Navigator.pop(context);
+        Navigator.pop(context, true);
       }
     } catch (e) {
       if (mounted) {
-        Navigator.pop(context); // pop loading
+        Navigator.pop(context);
         ScaffoldMessenger.of(context)
             .showSnackBar(SnackBar(content: Text('Could not delete: $e')));
       }
@@ -463,14 +480,13 @@ class _ChatScreenState extends State<ChatScreen> {
 
     const headerH = 66.0;
     const inputH  = 54.0;
-    const replyH  = 48.0;
+    const replyH  = 52.0;
     final headerTop = topPad + 8;
 
-    final effectiveInputH = inputH + (_replyingTo != null ? replyH : 0);
+    final effectiveInputH = inputH + (_replyingTo != null ? replyH + 8 : 0);
 
-    final otherUser = widget.conversation.getOtherParticipant(widget.myUserId);
-    final avatarLetter =
-        otherUser.username.isNotEmpty ? otherUser.username[0].toUpperCase() : '?';
+    final otherUser    = widget.conversation.getOtherParticipant(widget.myUserId);
+    final avatarLetter = otherUser.username.isNotEmpty ? otherUser.username[0].toUpperCase() : '?';
 
     return Scaffold(
       resizeToAvoidBottomInset: false,
@@ -488,21 +504,16 @@ class _ChatScreenState extends State<ChatScreen> {
               : _hasError
                   ? Center(
                       child: Column(mainAxisSize: MainAxisSize.min, children: [
-                        Text('Could not load messages',
-                            style: manrope(size: 14, color: sub)),
+                        Text('Could not load messages', style: manrope(size: 14, color: sub)),
                         const SizedBox(height: 8),
-                        TextButton(
-                          onPressed: _loadMessages,
-                          child: const Text('Retry'),
-                        ),
+                        TextButton(onPressed: _loadMessages, child: const Text('Retry')),
                       ]),
                     )
                   : ListView.builder(
                       controller: _scrollController,
                       reverse: true,
                       padding: const EdgeInsets.fromLTRB(12, 8, 12, 8),
-                      itemCount:
-                          _messages.length + (_typingUserId != null ? 1 : 0),
+                      itemCount: _messages.length + (_typingUserId != null ? 1 : 0),
                       itemBuilder: (context, index) {
                         if (_typingUserId != null) {
                           if (index == 0) {
@@ -514,8 +525,8 @@ class _ChatScreenState extends State<ChatScreen> {
                           index--;
                         }
 
-                        final msg = _messages[index];
-                        final isMe = msg.senderId == widget.myUserId;
+                        final msg       = _messages[index];
+                        final isMe      = msg.senderId == widget.myUserId;
                         final isPending = _pendingIds.contains(msg.id);
 
                         bool last = true;
@@ -528,9 +539,7 @@ class _ChatScreenState extends State<ChatScreen> {
                           padding: const EdgeInsets.only(bottom: 3),
                           child: SwipeToReply(
                             dark: widget.dark,
-                            onReply: () {
-                              setState(() => _replyingTo = msg);
-                            },
+                            onReply: () => setState(() => _replyingTo = msg),
                             child: GestureDetector(
                               onLongPress: () => _showMessageOptions(msg),
                               child: _Bubble(
@@ -549,7 +558,7 @@ class _ChatScreenState extends State<ChatScreen> {
                     ),
         ),
 
-        // ── Header ────────────────────────────────────────────
+        // ── Header ─────────────────────────────────────────────
         Positioned(
           top: headerTop, left: 12, right: 12,
           child: GlassHeader(
@@ -564,53 +573,38 @@ class _ChatScreenState extends State<ChatScreen> {
               ),
               Container(
                 width: 38, height: 38,
-                decoration: BoxDecoration(
-                    shape: BoxShape.circle,
-                    gradient: monoAvatar(widget.dark, 0)),
+                decoration: BoxDecoration(shape: BoxShape.circle, gradient: monoAvatar(widget.dark, 0)),
                 alignment: Alignment.center,
                 child: Text(avatarLetter,
-                    style: manrope(
-                        size: 15,
-                        weight: FontWeight.w700,
-                        color: Colors.white,
-                        letterSpacing: -0.3)),
+                    style: manrope(size: 15, weight: FontWeight.w700, color: Colors.white, letterSpacing: -0.3)),
               ),
               const SizedBox(width: 10),
               Expanded(
                 child: Column(
-                    crossAxisAlignment: CrossAxisAlignment.start,
-                    mainAxisSize: MainAxisSize.min,
-                    children: [
-                      Text(otherUser.username,
-                          maxLines: 1,
-                          overflow: TextOverflow.ellipsis,
-                          style: manrope(
-                              size: 15,
-                              weight: FontWeight.w800,
-                              color: fg,
-                              letterSpacing: -0.225)),
-                      const SizedBox(height: 2),
-                      Row(
-                        children: [
-                          Text(
-                            ChatService().isConnected ? 'Active now' : 'Connecting…',
-                            style: manrope(size: 11, weight: FontWeight.w500, color: sub),
-                          ),
-                          const SizedBox(width: 6),
-                          Container(
-                            width: 3, height: 3,
-                            decoration: BoxDecoration(shape: BoxShape.circle, color: sub),
-                          ),
-                          const SizedBox(width: 6),
-                          Icon(Icons.lock_outline_rounded, size: 10, color: sub),
-                          const SizedBox(width: 2),
-                          Text(
-                            'E2EE',
-                            style: manrope(size: 9.5, weight: FontWeight.w700, color: sub, letterSpacing: 0.5),
-                          ),
-                        ],
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  mainAxisSize: MainAxisSize.min,
+                  children: [
+                    Text(otherUser.username,
+                        maxLines: 1,
+                        overflow: TextOverflow.ellipsis,
+                        style: manrope(size: 15, weight: FontWeight.w800, color: fg, letterSpacing: -0.225)),
+                    const SizedBox(height: 2),
+                    Row(children: [
+                      Text(
+                        ChatService().isConnected ? 'Active now' : 'Connecting…',
+                        style: manrope(size: 11, weight: FontWeight.w500, color: sub),
                       ),
+                      const SizedBox(width: 6),
+                      Container(width: 3, height: 3,
+                          decoration: BoxDecoration(shape: BoxShape.circle, color: sub)),
+                      const SizedBox(width: 6),
+                      Icon(Icons.lock_outline_rounded, size: 10, color: sub),
+                      const SizedBox(width: 2),
+                      Text('E2EE',
+                          style: manrope(size: 9.5, weight: FontWeight.w700, color: sub, letterSpacing: 0.5)),
                     ]),
+                  ],
+                ),
               ),
               GlassCircleButton(dark: widget.dark, icon: Icons.call_outlined, iconSize: 18),
               const SizedBox(width: 6),
@@ -618,24 +612,21 @@ class _ChatScreenState extends State<ChatScreen> {
               const SizedBox(width: 6),
               GestureDetector(
                 onTap: _deleteConversation,
-                child: GlassCircleButton(
-                    dark: widget.dark,
-                    icon: Icons.delete_outline_rounded,
-                    iconSize: 18,
-                    fg: Colors.red),
+                child: GlassCircleButton(dark: widget.dark, icon: Icons.delete_outline_rounded, iconSize: 18, fg: Colors.red),
               ),
             ]),
           ),
         ),
 
-        // ── Input bar (+ optional reply strip) ───────────────
+        // ── Input bar + reply strip ─────────────────────────────
         Positioned(
           bottom: bottomPad + navPad + 8,
           left: 12, right: 12,
           child: Column(
             mainAxisSize: MainAxisSize.min,
             children: [
-              // ── Reply preview strip ───────────────────────
+
+              // ── Reply preview strip ── clearly visible glass box
               if (_replyingTo != null)
                 _ReplyPreview(
                   dark: widget.dark,
@@ -644,7 +635,7 @@ class _ChatScreenState extends State<ChatScreen> {
                   onCancel: () => setState(() => _replyingTo = null),
                 ),
 
-              // ── Text input ───────────────────────────────
+              // ── Text input ────────────────────────────────────
               SizedBox(
                 height: inputH,
                 child: GlassSurface(
@@ -666,9 +657,7 @@ class _ChatScreenState extends State<ChatScreen> {
                       dark: widget.dark,
                       icon: Icons.add_rounded,
                       size: 38, iconSize: 22,
-                      bg: widget.dark
-                          ? Colors.white.withOpacity(0.12)
-                          : Colors.black.withOpacity(0.08),
+                      bg: widget.dark ? Colors.white.withOpacity(0.12) : Colors.black.withOpacity(0.08),
                     ),
                     const SizedBox(width: 8),
                     Expanded(
@@ -677,10 +666,12 @@ class _ChatScreenState extends State<ChatScreen> {
                         onChanged: _onTyping,
                         onSubmitted: (_) => _sendMessage(),
                         textInputAction: TextInputAction.send,
-                        style: manrope(size: 14, weight: FontWeight.w500, color: GlassTokens.fg(widget.dark), letterSpacing: -0.07),
+                        style: manrope(size: 14, weight: FontWeight.w500,
+                            color: GlassTokens.fg(widget.dark), letterSpacing: -0.07),
                         decoration: InputDecoration(
                           hintText: _replyingTo != null ? 'Write a reply…' : 'Message…',
-                          hintStyle: manrope(size: 14, weight: FontWeight.w500, color: GlassTokens.sub(widget.dark), letterSpacing: -0.07),
+                          hintStyle: manrope(size: 14, weight: FontWeight.w500,
+                              color: GlassTokens.sub(widget.dark), letterSpacing: -0.07),
                           border: InputBorder.none,
                         ),
                       ),
@@ -708,13 +699,15 @@ class _ChatScreenState extends State<ChatScreen> {
   }
 }
 
-// ── Reply preview strip ──────────────────────────────────────
+// ── Reply preview strip (input bar ke upar) ──────────────────
+// FIX: Clearly visible glass box — not transparent
 
 class _ReplyPreview extends StatelessWidget {
   final bool dark;
   final String text;
   final double height;
   final VoidCallback onCancel;
+
   const _ReplyPreview({
     required this.dark,
     required this.text,
@@ -724,72 +717,86 @@ class _ReplyPreview extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final sub = GlassTokens.sub(dark);
-    final accent = dark ? Colors.white.withOpacity(0.8) : Colors.black87;
-    return Container(
-      height: height,
-      margin: const EdgeInsets.only(bottom: 8, left: 4, right: 4),
-      decoration: BoxDecoration(
-        color: dark
-            ? const Color(0xFF2E2E2E)
-            : Colors.white,
-        borderRadius: BorderRadius.circular(16),
-        border: Border.all(
-          color: dark
-              ? Colors.white.withOpacity(0.1)
-              : Colors.black.withOpacity(0.05),
-        ),
-        boxShadow: [
-          BoxShadow(
-            color: Colors.black.withOpacity(0.1),
-            blurRadius: 10,
-            offset: const Offset(0, 4),
-          )
-        ],
-      ),
-      padding: const EdgeInsets.symmetric(horizontal: 14),
-      child: Row(children: [
-        Container(
-          width: 4, height: 24,
+    final accentBar = dark ? Colors.white : const Color(0xFF0A0A0A);
+    final labelColor = dark ? Colors.white.withOpacity(0.55) : Colors.black.withOpacity(0.45);
+    final textColor  = dark ? Colors.white : Colors.black87;
+    final closeColor = dark ? Colors.white.withOpacity(0.45) : Colors.black.withOpacity(0.35);
+
+    return ClipRRect(
+      borderRadius: BorderRadius.circular(18),
+      child: BackdropFilter(
+        filter: ImageFilter.blur(sigmaX: 20, sigmaY: 20),
+        child: Container(
+          height: height,
+          margin: const EdgeInsets.only(bottom: 8, left: 2, right: 2),
           decoration: BoxDecoration(
-            color: accent,
-            borderRadius: BorderRadius.circular(4),
-          ),
-        ),
-        const SizedBox(width: 12),
-        Icon(Icons.reply_rounded, size: 16, color: accent),
-        const SizedBox(width: 8),
-        Expanded(
-          child: Column(
-            crossAxisAlignment: CrossAxisAlignment.start,
-            mainAxisAlignment: MainAxisAlignment.center,
-            children: [
-              Text(
-                'Replying to',
-                style: manrope(size: 10, weight: FontWeight.w700, color: accent),
-              ),
-              const SizedBox(height: 2),
-              Text(
-                text,
-                maxLines: 1,
-                overflow: TextOverflow.ellipsis,
-                style: manrope(size: 12.5, weight: FontWeight.w500, color: sub),
+            // Solid-enough background — clearly visible on any bg
+            color: dark
+                ? const Color(0xFF2A2A2E).withOpacity(0.95)
+                : Colors.white.withOpacity(0.96),
+            borderRadius: BorderRadius.circular(18),
+            border: Border.all(
+              color: dark
+                  ? Colors.white.withOpacity(0.14)
+                  : Colors.black.withOpacity(0.08),
+              width: 0.8,
+            ),
+            boxShadow: [
+              BoxShadow(
+                color: Colors.black.withOpacity(dark ? 0.40 : 0.10),
+                blurRadius: 16,
+                offset: const Offset(0, 4),
               ),
             ],
           ),
-        ),
-        GestureDetector(
-          onTap: onCancel,
-          child: Container(
-            padding: const EdgeInsets.all(4),
-            decoration: BoxDecoration(
-              shape: BoxShape.circle,
-              color: dark ? Colors.white.withOpacity(0.1) : Colors.black.withOpacity(0.05),
+          padding: const EdgeInsets.symmetric(horizontal: 14),
+          child: Row(children: [
+            // Accent left bar
+            Container(
+              width: 3.5, height: 28,
+              decoration: BoxDecoration(
+                color: accentBar,
+                borderRadius: BorderRadius.circular(4),
+              ),
             ),
-            child: Icon(Icons.close_rounded, size: 14, color: sub),
-          ),
+            const SizedBox(width: 12),
+            Icon(Icons.reply_rounded, size: 15, color: accentBar.withOpacity(0.7)),
+            const SizedBox(width: 8),
+            Expanded(
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                mainAxisAlignment: MainAxisAlignment.center,
+                children: [
+                  Text(
+                    'Replying to',
+                    style: manrope(size: 10.5, weight: FontWeight.w700, color: labelColor),
+                  ),
+                  const SizedBox(height: 2),
+                  Text(
+                    text,
+                    maxLines: 1,
+                    overflow: TextOverflow.ellipsis,
+                    style: manrope(size: 13, weight: FontWeight.w600, color: textColor),
+                  ),
+                ],
+              ),
+            ),
+            const SizedBox(width: 8),
+            GestureDetector(
+              onTap: onCancel,
+              child: Container(
+                width: 26, height: 26,
+                decoration: BoxDecoration(
+                  shape: BoxShape.circle,
+                  color: dark ? Colors.white.withOpacity(0.14) : Colors.black.withOpacity(0.07),
+                ),
+                alignment: Alignment.center,
+                child: Icon(Icons.close_rounded, size: 14, color: closeColor),
+              ),
+            ),
+          ]),
         ),
-      ]),
+      ),
     );
   }
 }
@@ -822,101 +829,111 @@ class _Bubble extends StatelessWidget {
 
     final radius = isMe
         ? const BorderRadius.only(
-            topLeft: Radius.circular(20),
-            topRight: Radius.circular(20),
-            bottomLeft: Radius.circular(20),
-            bottomRight: Radius.circular(6))
+            topLeft: Radius.circular(20), topRight: Radius.circular(20),
+            bottomLeft: Radius.circular(20), bottomRight: Radius.circular(6))
         : const BorderRadius.only(
-            topLeft: Radius.circular(20),
-            topRight: Radius.circular(20),
-            bottomLeft: Radius.circular(6),
-            bottomRight: Radius.circular(20));
+            topLeft: Radius.circular(20), topRight: Radius.circular(20),
+            bottomLeft: Radius.circular(6), bottomRight: Radius.circular(20));
 
     final timeStr =
         '${m.createdAt.hour.toString().padLeft(2, '0')}:${m.createdAt.minute.toString().padLeft(2, '0')}';
     final read = m.readBy.length > 1;
 
-    // Build the visible reactions (non-empty only)
-    final visibleReactions = m.reactions.entries
-        .where((e) => e.value.isNotEmpty)
-        .toList();
+    final visibleReactions =
+        m.reactions.entries.where((e) => e.value.isNotEmpty).toList();
 
     return Opacity(
       opacity: isPending ? 0.65 : 1.0,
       child: Align(
         alignment: isMe ? Alignment.centerRight : Alignment.centerLeft,
         child: ConstrainedBox(
-          constraints: BoxConstraints(
-              maxWidth: MediaQuery.of(context).size.width * 0.78),
+          constraints: BoxConstraints(maxWidth: MediaQuery.of(context).size.width * 0.78),
           child: Column(
-            crossAxisAlignment:
-                isMe ? CrossAxisAlignment.end : CrossAxisAlignment.start,
+            crossAxisAlignment: isMe ? CrossAxisAlignment.end : CrossAxisAlignment.start,
             mainAxisSize: MainAxisSize.min,
             children: [
-              // ── Reply preview inside bubble ────────────────
-              if (m.replyToId != null && m.replyToText != null && m.replyToText!.isNotEmpty)
-                _ReplyQuote(
-                  text: m.replyToText!,
-                  isMe: isMe,
-                  dark: dark,
-                  radius: radius,
-                ),
 
-              // ── Main bubble with floating reactions ────────
+              // ── Reply quote inside bubble ──────────────────
+              if (m.replyToId != null && m.replyToText != null && m.replyToText!.isNotEmpty)
+                _ReplyQuote(text: m.replyToText!, isMe: isMe, dark: dark, radius: radius),
+
+              // ── Main bubble + floating reaction chips ──────
               Stack(
                 clipBehavior: Clip.none,
                 children: [
                   _bubbleBox(dark, radius, sub, fg),
+
+                  // ── Instagram-style reaction chips ─────────
                   if (visibleReactions.isNotEmpty)
                     Positioned(
-                      bottom: -10,
-                      right: isMe ? 4 : null,
-                      left: isMe ? null : 4,
+                      bottom: -13,
+                      right: isMe ? 6 : null,
+                      left: isMe ? null : 6,
                       child: Row(
                         mainAxisSize: MainAxisSize.min,
                         children: visibleReactions.map((entry) {
-                          final emoji = entry.key;
-                          final count = entry.value.length;
+                          final emoji         = entry.key;
+                          final count         = entry.value.length;
                           final hasMyReaction = entry.value.contains(myUserId);
+
                           return GestureDetector(
                             onTap: () => onReact(emoji),
                             behavior: HitTestBehavior.opaque,
-                            child: Container(
-                              margin: const EdgeInsets.symmetric(horizontal: 2.0),
-                              padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 3),
+                            child: AnimatedContainer(
+                              duration: const Duration(milliseconds: 180),
+                              curve: Curves.easeOut,
+                              margin: const EdgeInsets.symmetric(horizontal: 2),
+                              padding: const EdgeInsets.symmetric(horizontal: 7, vertical: 4),
                               decoration: BoxDecoration(
-                                color: dark 
-                                    ? (hasMyReaction ? Colors.white.withOpacity(0.2) : Colors.white.withOpacity(0.1)) 
-                                    : (hasMyReaction ? Colors.black.withOpacity(0.08) : Colors.white),
+                                // Clean visible chip — same as Instagram
+                                color: dark
+                                    ? (hasMyReaction
+                                        ? Colors.white.withOpacity(0.22)
+                                        : const Color(0xFF2C2C2E))
+                                    : (hasMyReaction
+                                        ? const Color(0xFFE8F4FD)
+                                        : Colors.white),
                                 borderRadius: BorderRadius.circular(20),
                                 border: Border.all(
-                                  color: dark 
-                                      ? Colors.white.withOpacity(hasMyReaction ? 0.3 : 0.1) 
-                                      : Colors.black.withOpacity(hasMyReaction ? 0.15 : 0.05),
+                                  color: dark
+                                      ? (hasMyReaction
+                                          ? Colors.white.withOpacity(0.40)
+                                          : Colors.white.withOpacity(0.12))
+                                      : (hasMyReaction
+                                          ? const Color(0xFF0095F6).withOpacity(0.40)
+                                          : Colors.black.withOpacity(0.08)),
+                                  width: 1,
                                 ),
-                                boxShadow: dark ? [] : [
+                                boxShadow: [
                                   BoxShadow(
-                                    color: Colors.black.withOpacity(0.04),
-                                    blurRadius: 4,
+                                    color: Colors.black.withOpacity(dark ? 0.35 : 0.08),
+                                    blurRadius: 8,
                                     offset: const Offset(0, 2),
-                                  )
+                                  ),
                                 ],
                               ),
                               child: Row(
                                 mainAxisSize: MainAxisSize.min,
                                 children: [
+                                  // High-quality emoji render
                                   Text(
                                     emoji,
-                                    style: const TextStyle(fontSize: 13),
+                                    style: const TextStyle(
+                                      fontSize: 15,
+                                      height: 1.0,
+                                      fontFamilyFallback: ['Apple Color Emoji', 'Noto Color Emoji'],
+                                    ),
                                   ),
                                   if (count > 1) ...[
                                     const SizedBox(width: 4),
                                     Text(
                                       '$count',
                                       style: manrope(
-                                        size: 11,
+                                        size: 11.5,
                                         weight: FontWeight.w700,
-                                        color: dark ? Colors.white.withOpacity(0.9) : Colors.black87,
+                                        color: dark
+                                            ? Colors.white.withOpacity(0.9)
+                                            : Colors.black87,
                                       ),
                                     ),
                                   ],
@@ -930,8 +947,7 @@ class _Bubble extends StatelessWidget {
                 ],
               ),
 
-              if (visibleReactions.isNotEmpty)
-                const SizedBox(height: 6),
+              if (visibleReactions.isNotEmpty) const SizedBox(height: 8),
 
               // ── Timestamp + status ─────────────────────────
               if (last)
@@ -939,11 +955,8 @@ class _Bubble extends StatelessWidget {
                   padding: const EdgeInsets.only(top: 4, left: 4, right: 4),
                   child: Row(mainAxisSize: MainAxisSize.min, children: [
                     Text(timeStr,
-                        style: manrope(
-                            size: 10.5,
-                            weight: FontWeight.w500,
-                            color: sub,
-                            letterSpacing: -0.05)),
+                        style: manrope(size: 10.5, weight: FontWeight.w500,
+                            color: sub, letterSpacing: -0.05)),
                     if (m.encryptedAesKeys.isNotEmpty) ...[
                       const SizedBox(width: 4),
                       Icon(Icons.lock_rounded, size: 9, color: sub.withOpacity(0.6)),
@@ -951,9 +964,7 @@ class _Bubble extends StatelessWidget {
                     if (isMe) ...[
                       const SizedBox(width: 5),
                       Icon(
-                        isPending
-                            ? Icons.access_time_rounded
-                            : Icons.done_all_rounded,
+                        isPending ? Icons.access_time_rounded : Icons.done_all_rounded,
                         size: 13,
                         color: (read && !isPending) ? fg : sub,
                       ),
@@ -979,61 +990,46 @@ class _Bubble extends StatelessWidget {
               color: dark
                   ? Colors.white.withOpacity(0.15)
                   : const Color(0xFF14161E).withOpacity(0.25),
-              blurRadius: 16,
-              offset: const Offset(0, 6),
-              spreadRadius: -8,
+              blurRadius: 16, offset: const Offset(0, 6), spreadRadius: -8,
             ),
           ],
         ),
         child: Text(m.text,
-            style: manrope(
-                size: 14.5,
-                weight: FontWeight.w500,
+            style: manrope(size: 14.5, weight: FontWeight.w500,
                 color: dark ? const Color(0xFF0A0A0A) : Colors.white,
-                letterSpacing: -0.07,
-                height: 1.4)),
+                letterSpacing: -0.07, height: 1.4)),
       );
     }
     return Container(
       padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 10),
       decoration: BoxDecoration(
-        color: dark
-            ? const Color(0xFF242424).withOpacity(0.85)
-            : Colors.white.withOpacity(0.95),
+        color: dark ? const Color(0xFF242424).withOpacity(0.85) : Colors.white.withOpacity(0.95),
         border: Border.all(
-            color: dark
-                ? Colors.white.withOpacity(0.05)
-                : Colors.black.withOpacity(0.04)),
+            color: dark ? Colors.white.withOpacity(0.05) : Colors.black.withOpacity(0.04)),
         borderRadius: radius,
         boxShadow: [
           BoxShadow(
-            color: dark
-                ? Colors.black.withOpacity(0.4)
-                : const Color(0xFF14161E).withOpacity(0.08),
-            blurRadius: 12,
-            offset: const Offset(0, 4),
-            spreadRadius: -4,
+            color: dark ? Colors.black.withOpacity(0.4) : const Color(0xFF14161E).withOpacity(0.08),
+            blurRadius: 12, offset: const Offset(0, 4), spreadRadius: -4,
           ),
         ],
       ),
       child: Text(m.text,
-          style: manrope(
-              size: 14.5,
-              weight: FontWeight.w500,
-              color: GlassTokens.fg(dark),
-              letterSpacing: -0.07,
-              height: 1.4)),
+          style: manrope(size: 14.5, weight: FontWeight.w500,
+              color: GlassTokens.fg(dark), letterSpacing: -0.07, height: 1.4)),
     );
   }
 }
 
 // ── Reply quote shown inside bubble ──────────────────────────
+// FIX: Properly visible background — was near-invisible before
 
 class _ReplyQuote extends StatelessWidget {
   final String text;
   final bool isMe;
   final bool dark;
   final BorderRadius radius;
+
   const _ReplyQuote({
     required this.text,
     required this.isMe,
@@ -1043,35 +1039,71 @@ class _ReplyQuote extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final textColor = isMe 
-        ? (dark ? Colors.black87 : Colors.white70) 
-        : (dark ? Colors.white70 : Colors.black87);
+    // Clearly readable text + accent bar colors based on bubble type
+    final textColor = isMe
+        ? (dark ? Colors.black.withOpacity(0.75) : Colors.white.withOpacity(0.85))
+        : (dark ? Colors.white.withOpacity(0.80) : Colors.black.withOpacity(0.70));
+
+    final labelColor = isMe
+        ? (dark ? Colors.black.withOpacity(0.50) : Colors.white.withOpacity(0.60))
+        : (dark ? Colors.white.withOpacity(0.50) : Colors.black.withOpacity(0.45));
+
+    // Solid visible background — not transparent
     final bgColor = isMe
-        ? (dark ? Colors.black.withOpacity(0.08) : Colors.white.withOpacity(0.15))
-        : (dark ? Colors.white.withOpacity(0.06) : Colors.black.withOpacity(0.04));
-    
+        ? (dark
+            ? Colors.black.withOpacity(0.22)  // inside white bubble → dark strip
+            : Colors.white.withOpacity(0.22)) // inside black bubble → white strip
+        : (dark
+            ? Colors.white.withOpacity(0.10)  // inside dark grey bubble
+            : Colors.black.withOpacity(0.07)); // inside white bubble
+
+    final accentBar = isMe
+        ? (dark ? Colors.black.withOpacity(0.50) : Colors.white.withOpacity(0.60))
+        : (dark ? Colors.white.withOpacity(0.45) : Colors.black.withOpacity(0.35));
+
     return Container(
       margin: const EdgeInsets.only(bottom: 6),
       padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 8),
       decoration: BoxDecoration(
         color: bgColor,
-        borderRadius: BorderRadius.circular(10),
+        borderRadius: BorderRadius.circular(12),
+        border: Border.all(
+          color: isMe
+              ? (dark ? Colors.black.withOpacity(0.15) : Colors.white.withOpacity(0.20))
+              : (dark ? Colors.white.withOpacity(0.10) : Colors.black.withOpacity(0.06)),
+          width: 0.6,
+        ),
       ),
       child: Row(
         mainAxisSize: MainAxisSize.min,
         children: [
-          Icon(Icons.reply_rounded, size: 14, color: textColor.withOpacity(0.7)),
-          const SizedBox(width: 6),
+          // Accent left bar
+          Container(
+            width: 2.5, height: 30,
+            decoration: BoxDecoration(
+              color: accentBar,
+              borderRadius: BorderRadius.circular(4),
+            ),
+          ),
+          const SizedBox(width: 8),
           Flexible(
-            child: Text(
-              text,
-              maxLines: 2,
-              overflow: TextOverflow.ellipsis,
-              style: manrope(
-                  size: 12.5,
-                  weight: FontWeight.w500,
-                  color: textColor,
-                  height: 1.3),
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                Text(
+                  'Reply',
+                  style: manrope(size: 10, weight: FontWeight.w700, color: labelColor),
+                ),
+                const SizedBox(height: 2),
+                Text(
+                  text,
+                  maxLines: 2,
+                  overflow: TextOverflow.ellipsis,
+                  style: manrope(size: 12.5, weight: FontWeight.w500,
+                      color: textColor, height: 1.3),
+                ),
+              ],
             ),
           ),
         ],
@@ -1088,6 +1120,7 @@ class _SheetTile extends StatelessWidget {
   final String label;
   final Color fg;
   final VoidCallback onTap;
+
   const _SheetTile({
     required this.dark,
     required this.icon,
@@ -1107,11 +1140,7 @@ class _SheetTile extends StatelessWidget {
           Icon(icon, color: fg, size: 22),
           const SizedBox(width: 16),
           Text(label,
-              style: manrope(
-                  size: 15,
-                  weight: FontWeight.w600,
-                  color: fg,
-                  letterSpacing: -0.2)),
+              style: manrope(size: 15, weight: FontWeight.w600, color: fg, letterSpacing: -0.2)),
         ]),
       ),
     );
@@ -1128,32 +1157,22 @@ class _BubbleTyping extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     const br = BorderRadius.only(
-      topLeft: Radius.circular(18),
-      topRight: Radius.circular(18),
-      bottomLeft: Radius.circular(4),
-      bottomRight: Radius.circular(18),
+      topLeft: Radius.circular(18), topRight: Radius.circular(18),
+      bottomLeft: Radius.circular(4), bottomRight: Radius.circular(18),
     );
     return Align(
       alignment: Alignment.centerLeft,
       child: Container(
         padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 12),
         decoration: BoxDecoration(
-          color: dark
-              ? const Color(0xFF242424).withOpacity(0.85)
-              : Colors.white.withOpacity(0.95),
+          color: dark ? const Color(0xFF242424).withOpacity(0.85) : Colors.white.withOpacity(0.95),
           border: Border.all(
-              color: dark
-                  ? Colors.white.withOpacity(0.05)
-                  : Colors.black.withOpacity(0.04)),
+              color: dark ? Colors.white.withOpacity(0.05) : Colors.black.withOpacity(0.04)),
           borderRadius: br,
           boxShadow: [
             BoxShadow(
-              color: dark
-                  ? Colors.black.withOpacity(0.4)
-                  : const Color(0xFF14161E).withOpacity(0.08),
-              blurRadius: 12,
-              offset: const Offset(0, 4),
-              spreadRadius: -4,
+              color: dark ? Colors.black.withOpacity(0.4) : const Color(0xFF14161E).withOpacity(0.08),
+              blurRadius: 12, offset: const Offset(0, 4), spreadRadius: -4,
             ),
           ],
         ),
@@ -1176,17 +1195,15 @@ class _TypingDot extends StatefulWidget {
   State<_TypingDot> createState() => _TypingDotState();
 }
 
-class _TypingDotState extends State<_TypingDot>
-    with SingleTickerProviderStateMixin {
+class _TypingDotState extends State<_TypingDot> with SingleTickerProviderStateMixin {
   late final AnimationController _c;
+
   @override
   void initState() {
     super.initState();
-    _c = AnimationController(
-            vsync: this,
-            duration: const Duration(milliseconds: 1200))
-        ..repeat();
+    _c = AnimationController(vsync: this, duration: const Duration(milliseconds: 1200))..repeat();
   }
+
   @override
   void dispose() { _c.dispose(); super.dispose(); }
 
@@ -1197,10 +1214,8 @@ class _TypingDotState extends State<_TypingDot>
       animation: _c,
       builder: (_, __) {
         final t = ((_c.value * 1200) - widget.delay) % 1200 / 1200;
-        final v = (t >= 0 && t <= 0.8)
-            ? (t < 0.4 ? t / 0.4 : (0.8 - t) / 0.4)
-            : 0.0;
-        final scale = 0.7 + 0.3 * v.clamp(0.0, 1.0);
+        final v = (t >= 0 && t <= 0.8) ? (t < 0.4 ? t / 0.4 : (0.8 - t) / 0.4) : 0.0;
+        final scale   = 0.7 + 0.3 * v.clamp(0.0, 1.0);
         final opacity = 0.4 + 0.6 * v.clamp(0.0, 1.0);
         return Transform.scale(
           scale: scale,
@@ -1217,7 +1232,7 @@ class _TypingDotState extends State<_TypingDot>
   }
 }
 
-// ── Swipe to Reply Widget ────────────────────────────────────
+// ── Swipe to Reply ────────────────────────────────────────────
 
 class SwipeToReply extends StatefulWidget {
   final Widget child;
@@ -1237,8 +1252,7 @@ class SwipeToReply extends StatefulWidget {
   State<SwipeToReply> createState() => _SwipeToReplyState();
 }
 
-class _SwipeToReplyState extends State<SwipeToReply>
-    with SingleTickerProviderStateMixin {
+class _SwipeToReplyState extends State<SwipeToReply> with SingleTickerProviderStateMixin {
   late final AnimationController _controller;
   double _dragOffset = 0.0;
   bool _triggered = false;
@@ -1246,30 +1260,20 @@ class _SwipeToReplyState extends State<SwipeToReply>
   @override
   void initState() {
     super.initState();
-    _controller = AnimationController(
-      vsync: this,
-      duration: const Duration(milliseconds: 200),
-    );
+    _controller = AnimationController(vsync: this, duration: const Duration(milliseconds: 200));
   }
 
   @override
-  void dispose() {
-    _controller.dispose();
-    super.dispose();
-  }
+  void dispose() { _controller.dispose(); super.dispose(); }
 
   void _onHorizontalDragUpdate(DragUpdateDetails details) {
     if (!widget.enabled) return;
     setState(() {
-      _dragOffset += details.delta.dx;
-      if (_dragOffset < 0.0) _dragOffset = 0.0;
-      if (_dragOffset > 70.0) {
-        _dragOffset = 70.0;
-        if (!_triggered) {
-          _triggered = true;
-          HapticFeedback.lightImpact();
-        }
-      } else {
+      _dragOffset = (_dragOffset + details.delta.dx).clamp(0.0, 70.0);
+      if (_dragOffset >= 70.0 && !_triggered) {
+        _triggered = true;
+        HapticFeedback.lightImpact();
+      } else if (_dragOffset < 70.0) {
         _triggered = false;
       }
     });
@@ -1277,17 +1281,10 @@ class _SwipeToReplyState extends State<SwipeToReply>
 
   void _onHorizontalDragEnd(DragEndDetails details) {
     if (!widget.enabled) return;
-    if (_dragOffset >= 50.0) {
-      widget.onReply();
-    }
+    if (_dragOffset >= 50.0) widget.onReply();
     _controller.value = _dragOffset / 70.0;
     _controller.animateTo(0.0, curve: Curves.easeOut).then((_) {
-      if (mounted) {
-        setState(() {
-          _dragOffset = 0.0;
-          _triggered = false;
-        });
-      }
+      if (mounted) setState(() { _dragOffset = 0.0; _triggered = false; });
     });
   }
 
@@ -1302,9 +1299,7 @@ class _SwipeToReplyState extends State<SwipeToReply>
       child: AnimatedBuilder(
         animation: _controller,
         builder: (context, child) {
-          final offset = _controller.isAnimating
-              ? _controller.value * 70.0
-              : _dragOffset;
+          final offset   = _controller.isAnimating ? _controller.value * 70.0 : _dragOffset;
           final progress = (offset / 50.0).clamp(0.0, 1.0);
 
           return Stack(
@@ -1325,19 +1320,13 @@ class _SwipeToReplyState extends State<SwipeToReply>
                             ? Colors.white.withOpacity(0.12)
                             : Colors.black.withOpacity(0.08),
                       ),
-                      child: Icon(
-                        Icons.reply_rounded,
-                        color: widget.dark ? Colors.white : Colors.black87,
-                        size: 16,
-                      ),
+                      child: Icon(Icons.reply_rounded,
+                          color: widget.dark ? Colors.white : Colors.black87, size: 16),
                     ),
                   ),
                 ),
               ),
-              Transform.translate(
-                offset: Offset(offset, 0),
-                child: widget.child,
-              ),
+              Transform.translate(offset: Offset(offset, 0), child: widget.child),
             ],
           );
         },

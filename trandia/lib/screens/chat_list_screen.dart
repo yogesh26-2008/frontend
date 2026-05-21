@@ -430,7 +430,9 @@ class _ChatRow extends StatelessWidget {
         otherUser.username.isNotEmpty ? otherUser.username[0].toUpperCase() : '?';
 
     final unread    = c.unreadCounts[myUserId] ?? 0;
-    final lastText  = c.lastMessage ?? 'No messages yet';
+    // Clean up encrypted/failed preview — show plain fallback instead
+    final rawLast   = c.lastMessage ?? '';
+    final lastText  = _cleanPreview(rawLast);
     final timeStr   = _formatTime(c.lastMessageTime);
 
     final previewColor  = unread > 0 ? fg : sub;
@@ -527,7 +529,7 @@ class _ChatRow extends StatelessWidget {
                           weight: unread > 0 ? FontWeight.w700 : FontWeight.w500,
                           color: unread > 0 ? fg : sub,
                           letterSpacing: -0.05)),
-                  if (unread > 0) ...[
+                  if (unread > 0) ...[  // unread badge
                     const SizedBox(height: 6),
                     Container(
                       constraints: const BoxConstraints(minWidth: 20),
@@ -538,7 +540,7 @@ class _ChatRow extends StatelessWidget {
                         color: dark ? Colors.white : const Color(0xFF0A0A0A),
                         borderRadius: BorderRadius.circular(999),
                       ),
-                      child: Text('$unread',
+                      child: Text(unread > 99 ? '99+' : '$unread',
                           style: manrope(
                               size: 11,
                               weight: FontWeight.w800,
@@ -552,6 +554,17 @@ class _ChatRow extends StatelessWidget {
         ]),
       ),
     );
+  }
+
+  String _cleanPreview(String raw) {
+    if (raw.isEmpty) return 'No messages yet';
+    // Hide raw encrypted payloads and fallback strings from chat_service
+    if (raw.contains('[Encrypted Message]') ||
+        raw.startsWith('{"ct":') ||
+        raw.startsWith('{"ct" :')) {
+      return '\u{1F4AC} Message';
+    }
+    return raw;
   }
 
   String _formatTime(DateTime? time) {

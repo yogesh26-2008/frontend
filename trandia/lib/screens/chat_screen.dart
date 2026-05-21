@@ -8,8 +8,10 @@
 
 import 'dart:ui';
 import 'dart:async';
+import 'dart:convert';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
+import 'package:shared_preferences/shared_preferences.dart';
 import '../models/chat_model.dart';
 import '../services/chat_service.dart';
 import 'glass_common.dart';
@@ -121,18 +123,70 @@ class _ChatScreenState extends State<ChatScreen> {
     super.dispose();
   }
 
-  Future<void> _loadMessages() async {
-    if (mounted) setState(() { _isLoading = true; _hasError = false; });
+  // ── Cache helpers ──────────────────────────────────────────
+  static const _cachePrefix = 'chat_msgs_';
+
+  Future<void> _saveToCache(List<ChatMessage> msgs) async {
     try {
-      final msgs = await ChatService().getMessages(widget.conversation.id, limit: 25);
+      final prefs = await SharedPreferences.getInstance();
+      final data = msgs.map((m) => {
+        'id': m.id,
+        'conversation_id': m.conversationId,
+        'sender_id': m.senderId,
+        'text': m.text,
+        'created_at': m.createdAt.toUtc().toIso8601String(),
+        'read_by': m.readBy,
+        'encrypted_aes_keys': m.encryptedAesKeys,
+        'reactions': m.reactions.map((k, v) => MapEntry(k, v)),
+        if (m.replyToId != null) 'reply_to_id': m.replyToId,
+        if (m.replyToText != null) 'reply_to_text': m.replyToText,
+      }).toList();
+      await prefs.setString('$_cachePrefix${widget.conversation.id}', jsonEncode(data));
+    } catch (_) {}
+  }
+
+  Future<void> _loadFromCache() async {
+    try {
+      final prefs = await SharedPreferences.getInstance();
+      final raw = prefs.getString('$_cachePrefix${widget.conversation.id}');
+      if (raw == null || !mounted) return;
+      final List decoded = jsonDecode(raw);
+      final cached = decoded
+          .map((e) => ChatMessage.fromJson(e as Map<String, dynamic>))
+          .where(_isDisplayableMessage)
+          .toList();
+      if (cached.isNotEmpty && mounted) {
+        setState(() {
+          _messages = cached;
+          _isLoading = false;
+        });
+      }
+    } catch (_) {}
+  }
+
+  Future<void> _loadMessages() async {
+    // Step 1: Show cached messages instantly (no loading spinner if cache exists)
+    await _loadFromCache();
+
+    // Step 2: Fetch fresh from API in background (silent refresh)
+    try {
+      final msgs = await ChatService().getMessages(widget.conversation.id, limit: 30);
       if (mounted) {
         setState(() {
           _messages = msgs.where(_isDisplayableMessage).toList();
           _isLoading = false;
+          _hasError = false;
         });
+        // Save fresh data to cache for next open
+        _saveToCache(msgs.where(_isDisplayableMessage).toList());
       }
     } catch (e) {
-      if (mounted) setState(() { _isLoading = false; _hasError = true; });
+      // If API fails but we have cached data, don't show error
+      if (mounted && _messages.isEmpty) {
+        setState(() { _isLoading = false; _hasError = true; });
+      } else if (mounted) {
+        setState(() { _isLoading = false; });
+      }
     }
   }
 

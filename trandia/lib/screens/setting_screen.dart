@@ -1,6 +1,7 @@
 import 'dart:ui';
 import 'package:flutter/material.dart';
 import 'glass_common.dart';
+import 'edit_profile_screen.dart';
 
 class SettingsScreen extends StatefulWidget {
   final bool dark;
@@ -79,6 +80,33 @@ class _SettingsScreenState extends State<SettingsScreen> {
                             icon: Icons.person_outline_rounded,
                             title: 'Edit profile',
                             subtitle: 'Name, bio, links and photo',
+                            onTap: () => Navigator.of(context).push(
+                              PageRouteBuilder(
+                                pageBuilder: (_, animation, __) =>
+                                    EditProfileScreen(dark: dark),
+                                transitionDuration:
+                                    const Duration(milliseconds: 320),
+                                reverseTransitionDuration:
+                                    const Duration(milliseconds: 260),
+                                transitionsBuilder: (_, animation, __, child) {
+                                  final curved = CurvedAnimation(
+                                    parent: animation,
+                                    curve: Curves.easeOutCubic,
+                                    reverseCurve: Curves.easeInCubic,
+                                  );
+                                  return SlideTransition(
+                                    position: Tween<Offset>(
+                                      begin: const Offset(0, 0.05),
+                                      end: Offset.zero,
+                                    ).animate(curved),
+                                    child: FadeTransition(
+                                      opacity: curved,
+                                      child: child,
+                                    ),
+                                  );
+                                },
+                              ),
+                            ),
                           ),
                           _SettingRow(
                             dark: dark,
@@ -276,12 +304,14 @@ class _SettingRow extends StatelessWidget {
   final IconData icon;
   final String title;
   final String subtitle;
+  final VoidCallback? onTap;
 
   const _SettingRow({
     required this.dark,
     required this.icon,
     required this.title,
     required this.subtitle,
+    this.onTap,
   });
 
   @override
@@ -291,6 +321,7 @@ class _SettingRow extends StatelessWidget {
       icon: icon,
       title: title,
       subtitle: subtitle,
+      onTap: onTap,
       trailing: Icon(Icons.chevron_right_rounded, color: GlassTokens.sub(dark), size: 24),
     );
   }
@@ -338,6 +369,7 @@ class _BaseRow extends StatelessWidget {
   final String title;
   final String subtitle;
   final Widget trailing;
+  final VoidCallback? onTap;
 
   const _BaseRow({
     required this.dark,
@@ -345,6 +377,7 @@ class _BaseRow extends StatelessWidget {
     required this.title,
     required this.subtitle,
     required this.trailing,
+    this.onTap,
   });
 
   @override
@@ -352,34 +385,40 @@ class _BaseRow extends StatelessWidget {
     final fg = GlassTokens.fg(dark);
     final sub = GlassTokens.sub(dark);
 
-    return Container(
-      constraints: const BoxConstraints(minHeight: 72),
-      padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 10),
-      child: Row(
-        children: [
-          Container(
-            width: 38,
-            height: 38,
-            decoration: BoxDecoration(
-              shape: BoxShape.circle,
-              color: dark ? Colors.white.withOpacity(0.09) : Colors.black.withOpacity(0.06),
-            ),
-            child: Icon(icon, size: 20, color: fg),
+    return Material(
+      color: Colors.transparent,
+      child: InkWell(
+        onTap: onTap,
+        child: Container(
+          constraints: const BoxConstraints(minHeight: 72),
+          padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 10),
+          child: Row(
+            children: [
+              Container(
+                width: 38,
+                height: 38,
+                decoration: BoxDecoration(
+                  shape: BoxShape.circle,
+                  color: dark ? Colors.white.withOpacity(0.09) : Colors.black.withOpacity(0.06),
+                ),
+                child: Icon(icon, size: 20, color: fg),
+              ),
+              const SizedBox(width: 12),
+              Expanded(
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Text(title, style: manrope(size: 14.5, weight: FontWeight.w800, color: fg)),
+                    const SizedBox(height: 3),
+                    Text(subtitle, style: manrope(size: 12, weight: FontWeight.w500, color: sub)),
+                  ],
+                ),
+              ),
+              const SizedBox(width: 10),
+              trailing,
+            ],
           ),
-          const SizedBox(width: 12),
-          Expanded(
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                Text(title, style: manrope(size: 14.5, weight: FontWeight.w800, color: fg)),
-                const SizedBox(height: 3),
-                Text(subtitle, style: manrope(size: 12, weight: FontWeight.w500, color: sub)),
-              ],
-            ),
-          ),
-          const SizedBox(width: 10),
-          trailing,
-        ],
+        ),
       ),
     );
   }

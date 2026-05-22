@@ -877,11 +877,13 @@ class _StaggeredNavbar extends StatelessWidget {
                                   ? (isDark ? Colors.white.op(0.18)
                                             : Colors.black.op(0.12))
                                   : Colors.transparent),
-                            child: Center(child: CustomPaint(
-                              size: const Size(24.0, 24.0),
-                              painter: _NavIconPainter(
-                                  index: i, isDark: isDark,
-                                  active: active)))))))));
+                            child: Center(
+                              child: CustomPaint(
+                                size: const Size(24.0, 24.0),
+                                painter: _NavIconPainter(index: i, isDark: isDark, active: active),
+                              ),
+                            ),
+                      ))))));
                 }),
               ),
             ),
@@ -987,15 +989,27 @@ class _NavIconPainter extends CustomPainter {
         canvas.drawPath(door, stroke);
         break;
 
-      // ── 1: Trends — play triangle ──
+      // ── 1: Trends — play button with cutout play triangle ──
       case 1:
-        final playFill = Paint()..color = col..style = PaintingStyle.fill;
-        final play = Path()
-          ..moveTo(w * 0.22, h * 0.12)
-          ..lineTo(w * 0.85, cy)
-          ..lineTo(w * 0.22, h * 0.88)
+        final double inset = 1.5;
+        final rr = RRect.fromRectAndRadius(
+            Rect.fromLTWH(inset, inset, w - inset * 2, h - inset * 2),
+            Radius.circular(6.0));
+        final bounds = Rect.fromLTWH(0, 0, w, h);
+        canvas.saveLayer(bounds, Paint());
+        // Draw the filled rounded rectangle
+        canvas.drawRRect(rr, Paint()..color = col..style = PaintingStyle.fill);
+        // Draw the play triangle cutout
+        final playPath = Path()
+          ..moveTo(w * 0.38, h * 0.31)
+          ..lineTo(w * 0.69, cy)
+          ..lineTo(w * 0.38, h * 0.69)
           ..close();
-        canvas.drawPath(play, playFill);
+        canvas.drawPath(playPath, Paint()
+          ..color = Colors.transparent
+          ..blendMode = BlendMode.clear
+          ..style = PaintingStyle.fill);
+        canvas.restore();
         break;
 
       // ── 2: Create / Add — rounded square + thin plus ──

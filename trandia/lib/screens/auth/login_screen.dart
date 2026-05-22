@@ -52,6 +52,7 @@ class _LoginScreenState extends State<LoginScreen> {
     try {
       await AuthService.login(email, password);
       if (!mounted) return;
+
       Navigator.pushAndRemoveUntil(
         context,
         MaterialPageRoute(builder: (_) => const HomeScreen()),
@@ -72,6 +73,7 @@ class _LoginScreenState extends State<LoginScreen> {
       final result = await AuthService.loginWithGoogle();
       if (result == null) return;
       if (!mounted) return;
+
       Navigator.pushAndRemoveUntil(
         context,
         MaterialPageRoute(builder: (_) => const HomeScreen()),

@@ -2,6 +2,7 @@ import 'dart:ui';
 import 'package:flutter/material.dart';
 import 'glass_common.dart';
 import 'edit_profile_screen.dart';
+import 'parental_control_screen.dart';
 
 class SettingsScreen extends StatefulWidget {
   final bool dark;
@@ -15,6 +16,7 @@ class _SettingsScreenState extends State<SettingsScreen> {
   bool privateAccount = true;
   bool activityStatus = false;
   bool notifications = true;
+  String selectedLanguage = 'English';
 
   @override
   Widget build(BuildContext context) {
@@ -152,6 +154,36 @@ class _SettingsScreenState extends State<SettingsScreen> {
                             onChanged: (v) => setState(() => privateAccount = v),
                           ),
                         ],
+                      ),
+                      const SizedBox(height: 16),
+                      // Language selection row
+                      _BaseRow(
+                        dark: dark,
+                        icon: Icons.language,
+                        title: 'Language',
+                        subtitle: selectedLanguage,
+                        trailing: DropdownButton<String>(
+                          value: selectedLanguage,
+                          underline: const SizedBox(),
+                          icon: Icon(Icons.arrow_drop_down, color: GlassTokens.sub(dark)),
+                          items: ['English', 'Hindi', 'Hinglish']
+                              .map((lang) => DropdownMenuItem(value: lang, child: Text(lang)))
+                              .toList(),
+                          onChanged: (v) {
+                            if (v != null) setState(() => selectedLanguage = v);
+                          },
+                        ),
+                      ),
+                      // Parental Control option
+                      GestureDetector(
+                        onTap: () => Navigator.push(context, MaterialPageRoute(builder: (_) => ParentalControlScreen(dark: dark))),
+                        child: _BaseRow(
+                          dark: dark,
+                          icon: Icons.supervised_user_circle,
+                          title: 'Parental Control',
+                          subtitle: '',
+                          trailing: Icon(Icons.chevron_right_rounded, color: GlassTokens.sub(dark), size: 24),
+                        ),
                       ),
                       const SizedBox(height: 16),
                       _SectionTitle('MORE', color: sub),

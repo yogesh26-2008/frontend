@@ -2,14 +2,12 @@ import 'dart:async';
 
 import 'package:firebase_core/firebase_core.dart';
 import 'package:firebase_messaging/firebase_messaging.dart';
-import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 
 import 'firebase_options.dart';
-import 'screens/auth/login_screen.dart';
 import 'screens/home/home_screen.dart';
 import 'screens/splash_screen.dart';
-import 'services/auth_service.dart';
+import 'screens/intro_slides.dart';
 import 'services/api_service.dart';
 import 'services/fcm_service.dart';
 import 'utils/web_utils.dart';
@@ -25,7 +23,7 @@ final GlobalKey<NavigatorState> navigatorKey = GlobalKey<NavigatorState>();
 void main() async {
   WidgetsFlutterBinding.ensureInitialized();
 
-  // 1. Firebase
+  // Initialize Firebase
   try {
     await Firebase.initializeApp(options: DefaultFirebaseOptions.currentPlatform);
     debugPrint('[Firebase] ✅ initialized');
@@ -33,19 +31,15 @@ void main() async {
     debugPrint('[Firebase] ❌ $e');
   }
 
-  // 2. Background FCM handler — must register before runApp
+  // Register background message handler
   FirebaseMessaging.onBackgroundMessage(_bgMessageHandler);
 
-  // 3. Init local notifications + channel + cache FCM token eagerly
+  // Initialize local notifications and token handling
   await FcmService.init();
-
-  // 4. Foreground message listener — active before any screen loads
   FcmService.startForegroundListener();
-
-  // 5. Token refresh listener
   FcmService.listenForTokenRefresh();
 
-  // 6. Background notification tap
+  // Handle notification taps when app is terminated
   FirebaseMessaging.onMessageOpenedApp.listen(
     (msg) => debugPrint('[FCM] opened from background: ${msg.data}'),
   );
@@ -59,6 +53,7 @@ void main() async {
 
 class TrandiaApp extends StatefulWidget {
   const TrandiaApp({super.key});
+
   @override
   State<TrandiaApp> createState() => _TrandiaAppState();
 }
@@ -72,40 +67,41 @@ class _TrandiaAppState extends State<TrandiaApp> {
 
   Future<void> _checkInitialNotification() async {
     final msg = await FirebaseMessaging.instance.getInitialMessage();
-    if (msg != null) debugPrint('[FCM] app opened from terminated: ${msg.data}');
+    if (msg != null) {
+      debugPrint('[FCM] app opened from terminated: ${msg.data}');
+    }
   }
 
   @override
-  Widget build(BuildContext context) => MaterialApp(
-        debugShowCheckedModeBanner: false,
-        title: 'Trandia',
-        navigatorKey: navigatorKey,
-        theme: ThemeData(
-          brightness: Brightness.light,
-          scaffoldBackgroundColor: const Color(0xFFFFFFFF),
-          colorScheme: const ColorScheme.light(
-            surface: Color(0xFFFFFFFF),
-          ),
-        ),
-        darkTheme: ThemeData(
-          brightness: Brightness.dark,
-          scaffoldBackgroundColor: const Color(0xFF111111),
-          colorScheme: const ColorScheme.dark(
-            surface: Color(0xFF111111),
-          ),
-        ),
-        themeMode: ThemeMode.system,
-        home: const SplashScreen(nextScreen: _SplashRouter()),
-      );
+  Widget build(BuildContext context) {
+    return MaterialApp(
+      debugShowCheckedModeBanner: false,
+      title: 'Trandia',
+      navigatorKey: navigatorKey,
+      theme: ThemeData(
+        brightness: Brightness.light,
+        scaffoldBackgroundColor: const Color(0xFFFFFFFF),
+        colorScheme: const ColorScheme.light(surface: Color(0xFFFFFFFF)),
+      ),
+      darkTheme: ThemeData(
+        brightness: Brightness.dark,
+        scaffoldBackgroundColor: const Color(0xFF111111),
+        colorScheme: const ColorScheme.dark(surface: Color(0xFF111111)),
+      ),
+      themeMode: ThemeMode.system,
+      home: const SplashScreen(nextScreen: _StartupRouter()),
+    );
+  }
 }
 
-class _SplashRouter extends StatefulWidget {
-  const _SplashRouter();
+class _StartupRouter extends StatefulWidget {
+  const _StartupRouter();
+
   @override
-  State<_SplashRouter> createState() => _SplashRouterState();
+  State<_StartupRouter> createState() => _StartupRouterState();
 }
 
-class _SplashRouterState extends State<_SplashRouter> {
+class _StartupRouterState extends State<_StartupRouter> {
   @override
   void initState() {
     super.initState();
@@ -113,29 +109,27 @@ class _SplashRouterState extends State<_SplashRouter> {
   }
 
   Future<void> _route() async {
-    // Web OAuth redirect — pick up token from URL
     final params = getUrlSearchParams();
     if (params.containsKey('token')) {
       await ApiService.saveToken(params['token']!);
       clearUrlSearchParams();
       if (!mounted) return;
-      _go(const HomeScreen());
+      Navigator.of(context).pushReplacement(
+        MaterialPageRoute(builder: (_) => const HomeScreen()),
+      );
       return;
     }
-    try {
-      final ok = await AuthService.isLoggedIn();
-      if (!mounted) return;
-      _go(ok ? const HomeScreen() : const LoginScreen());
-    } catch (_) {
-      if (!mounted) return;
-      _go(const LoginScreen());
-    }
+
+    if (!mounted) return;
+    Navigator.of(context).pushReplacement(
+      MaterialPageRoute(builder: (_) => const IntroSlidesScreen()),
+    );
   }
 
-  void _go(Widget w) =>
-      Navigator.pushReplacement(context, MaterialPageRoute(builder: (_) => w));
-
   @override
-  Widget build(BuildContext context) =>
-      const Scaffold(body: Center(child: CircularProgressIndicator()));
+  Widget build(BuildContext context) {
+    return const Scaffold(
+      body: Center(child: CircularProgressIndicator()),
+    );
+  }
 }

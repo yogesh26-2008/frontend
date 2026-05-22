@@ -47,6 +47,13 @@ class _IntroSlidesScreenState extends State<IntroSlidesScreen> {
     }
   }
 
+  void _skip() {
+    Navigator.pushReplacement(
+      context,
+      MaterialPageRoute(builder: (_) => const LoginScreen()),
+    );
+  }
+
   @override
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
@@ -55,12 +62,37 @@ class _IntroSlidesScreenState extends State<IntroSlidesScreen> {
       body: SafeArea(
         child: Column(
           children: [
+            Align(
+              alignment: Alignment.centerRight,
+              child: TextButton(
+                onPressed: _skip,
+                child: const Text('Skip'),
+              ),
+            ),
             Expanded(
               child: PageView.builder(
                 controller: _controller,
                 itemCount: _pages.length,
                 onPageChanged: (i) => setState(() => _page = i),
                 itemBuilder: (c, i) => _pages[i],
+              ),
+            ),
+            Row(
+              mainAxisAlignment: MainAxisAlignment.center,
+              children: List.generate(
+                _pages.length,
+                (i) => AnimatedContainer(
+                  duration: const Duration(milliseconds: 200),
+                  margin: const EdgeInsets.symmetric(horizontal: 4),
+                  width: 8,
+                  height: 8,
+                  decoration: BoxDecoration(
+                    color: i == _page
+                        ? theme.colorScheme.primary
+                        : theme.colorScheme.onSurface.withOpacity(0.3),
+                    shape: BoxShape.circle,
+                  ),
+                ),
               ),
             ),
             Padding(
@@ -95,7 +127,12 @@ class _Slide extends StatelessWidget {
         mainAxisAlignment: MainAxisAlignment.center,
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          Text(title, style: theme.textTheme.headlineMedium?.copyWith(fontWeight: FontWeight.bold)),
+          Text(
+            title,
+            style: theme.textTheme.headlineMedium?.copyWith(
+              fontWeight: FontWeight.bold,
+            ),
+          ),
           const SizedBox(height: 16),
           Text(description, style: theme.textTheme.bodyMedium),
         ],

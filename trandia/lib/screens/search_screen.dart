@@ -17,6 +17,7 @@ import '../services/chat_service.dart';
 import '../services/user_service.dart';
 import '../models/chat_model.dart';
 import 'chat_screen.dart';
+import 'user_profile_screen.dart';
 
 /// ─── BUG FIX: _startChat ────────────────────────────────────────────────────
 /// Previous version had 3 bugs:
@@ -410,7 +411,7 @@ class _SearchScreenState extends State<SearchScreen> {
                           u: _searchResults[i],
                           i: i,
                           dark: dark,
-                          onTap: () async {
+                          onTap: () {
                             final u = _searchResults[i];
                             _addRecentItem(RecentItem(
                               kind: RecentKind.user,
@@ -421,7 +422,35 @@ class _SearchScreenState extends State<SearchScreen> {
                               isFollowing: u.isFollowing,
                               displayName: u.name,
                             ));
-                            await _startChat(context, u.username, dark, selectedUser: u);
+                            Navigator.of(context).push(
+                              PageRouteBuilder(
+                                pageBuilder: (_, animation, __) => ProfileScreen(
+                                  displayName: u.name,
+                                  handle: u.username,
+                                  followers: u.followersCount > 999
+                                      ? '${(u.followersCount / 1000).toStringAsFixed(1)}K'
+                                      : u.followersCount.toString(),
+                                  following: u.followingCount.toString(),
+                                  initialFollowing: u.isFollowing,
+                                ),
+                                transitionDuration: const Duration(milliseconds: 380),
+                                reverseTransitionDuration: const Duration(milliseconds: 300),
+                                transitionsBuilder: (_, animation, __, child) {
+                                  final curved = CurvedAnimation(
+                                    parent: animation,
+                                    curve: Curves.easeOutCubic,
+                                    reverseCurve: Curves.easeInCubic,
+                                  );
+                                  return SlideTransition(
+                                    position: Tween<Offset>(
+                                      begin: const Offset(1.0, 0),
+                                      end: Offset.zero,
+                                    ).animate(curved),
+                                    child: FadeTransition(opacity: curved, child: child),
+                                  );
+                                },
+                              ),
+                            );
                           },
                           onRemove: () {
                             setState(() {
@@ -819,19 +848,33 @@ class _RecentRow extends StatelessWidget {
     }
 
     return GestureDetector(
-      onTap: () async {
+      onTap: () {
         if (r.kind == RecentKind.user) {
-          UserProfile? u;
-          if (r.id != null && !r.id!.contains('_placeholder')) {
-            u = UserProfile(
-              id: r.id!,
-              name: r.displayName ?? r.name,
-              username: r.name,
-              picture: r.picture,
-              isFollowing: r.isFollowing ?? false,
-            );
-          }
-          await _startChat(context, r.name, dark, selectedUser: u);
+          Navigator.of(context).push(
+            PageRouteBuilder(
+              pageBuilder: (_, animation, __) => ProfileScreen(
+                displayName: r.displayName ?? r.name,
+                handle: r.name,
+                initialFollowing: r.isFollowing ?? false,
+              ),
+              transitionDuration: const Duration(milliseconds: 380),
+              reverseTransitionDuration: const Duration(milliseconds: 300),
+              transitionsBuilder: (_, animation, __, child) {
+                final curved = CurvedAnimation(
+                  parent: animation,
+                  curve: Curves.easeOutCubic,
+                  reverseCurve: Curves.easeInCubic,
+                );
+                return SlideTransition(
+                  position: Tween<Offset>(
+                    begin: const Offset(1.0, 0),
+                    end: Offset.zero,
+                  ).animate(curved),
+                  child: FadeTransition(opacity: curved, child: child),
+                );
+              },
+            ),
+          );
         }
       },
       child: Padding(
@@ -878,9 +921,36 @@ class _UserResultRow extends StatelessWidget {
     final sub = GlassTokens.sub(dark);
 
     return GestureDetector(
-      // FIX: async + await — exceptions are surfaced, not silently dropped
-      onTap: onTap ?? () async {
-        await _startChat(context, u.username, dark, selectedUser: u);
+      onTap: onTap ?? () {
+        Navigator.of(context).push(
+          PageRouteBuilder(
+            pageBuilder: (_, animation, __) => ProfileScreen(
+              displayName: u.name,
+              handle: u.username,
+              followers: u.followersCount > 999
+                  ? '${(u.followersCount / 1000).toStringAsFixed(1)}K'
+                  : u.followersCount.toString(),
+              following: u.followingCount.toString(),
+              initialFollowing: u.isFollowing,
+            ),
+            transitionDuration: const Duration(milliseconds: 380),
+            reverseTransitionDuration: const Duration(milliseconds: 300),
+            transitionsBuilder: (_, animation, __, child) {
+              final curved = CurvedAnimation(
+                parent: animation,
+                curve: Curves.easeOutCubic,
+                reverseCurve: Curves.easeInCubic,
+              );
+              return SlideTransition(
+                position: Tween<Offset>(
+                  begin: const Offset(1.0, 0),
+                  end: Offset.zero,
+                ).animate(curved),
+                child: FadeTransition(opacity: curved, child: child),
+              );
+            },
+          ),
+        );
       },
       child: Padding(
         padding: const EdgeInsets.symmetric(horizontal: 4, vertical: 10),

@@ -10,6 +10,7 @@
 
 import 'dart:ui';
 import 'package:flutter/material.dart';
+import '../l10n/app_localizations.dart';
 import 'glass_common.dart';
 import 'comments_screen.dart';
 
@@ -110,7 +111,7 @@ class _ShotsScreenState extends State<ShotsScreen>
           top: topInset == 0 ? 14 : topInset + 10,
           left: 16,
           right: 16,
-          child: _TopBar(feed: _feed, onTap: _setFeed),
+          child: _TopBar(feed: _feed, onTap: _setFeed, onExit: () => Navigator.of(context).pop()),
         ),
         // Right rail
         Positioned(
@@ -256,18 +257,19 @@ class _Video extends StatelessWidget {
 }
 
 // ───────────────────────────────────────────────────────────────
-// Top bar — pill switcher + camera
+// Top bar — exit + pill switcher + camera
 // ───────────────────────────────────────────────────────────────
 class _TopBar extends StatelessWidget {
   final ShotsFeed feed;
   final ValueChanged<ShotsFeed> onTap;
-  const _TopBar({required this.feed, required this.onTap});
+  final VoidCallback onExit;
+  const _TopBar({required this.feed, required this.onTap, required this.onExit});
 
   @override
   Widget build(BuildContext context) {
     return Row(
       children: [
-        const SizedBox(width: 24),
+        _BareIcon(icon: Icons.arrow_back_ios_new, size: 22, onTap: onExit),
         Expanded(child: Center(child: _FeedPill(feed: feed, onTap: onTap))),
         _BareIcon(icon: Icons.photo_camera_outlined, size: 24, onTap: () {}),
       ],
@@ -351,7 +353,7 @@ class _PillTab extends StatelessWidget {
         borderRadius: BorderRadius.circular(999),
         child: Center(
           child: Text(
-            label,
+            label.tr(context),
             style: manrope(
               size: 13,
               weight: active ? FontWeight.w800 : FontWeight.w600,
@@ -769,7 +771,7 @@ class _CaptionBlock extends StatelessWidget {
               child: Padding(
                 padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 5),
                 child: Text(
-                  'Follow',
+                  'Follow'.tr(context),
                   style: manrope(
                     size: 12, weight: FontWeight.w800,
                     color: const Color(0xFF0A0A0A), letterSpacing: -0.06,

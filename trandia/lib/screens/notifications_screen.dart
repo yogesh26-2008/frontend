@@ -13,6 +13,7 @@ import 'package:flutter/material.dart';
 import 'package:firebase_messaging/firebase_messaging.dart';
 import '../services/api_service.dart';
 import '../services/chat_service.dart';
+import '../l10n/app_localizations.dart';
 import 'glass_common.dart';
 
 enum NfKind { like, comment, follow, mention, live, msg, system }
@@ -105,7 +106,8 @@ const int    _kMaxStack   = 4;
 
 class NotificationsScreen extends StatefulWidget {
   final bool dark;
-  const NotificationsScreen({super.key, required this.dark});
+  final VoidCallback? onClose;
+  const NotificationsScreen({super.key, required this.dark, this.onClose});
 
   @override
   State<NotificationsScreen> createState() => _NotificationsScreenState();
@@ -245,7 +247,7 @@ class _NotificationsScreenState extends State<NotificationsScreen> {
       final restoreIndex = index > _items.length ? _items.length : index;
       setState(() { _items.insert(restoreIndex, removed); });
       ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text('Could not delete notification')),
+        SnackBar(content: Text('Could not delete notification'.tr(context))),
       );
     }
   }
@@ -281,28 +283,25 @@ class _NotificationsScreenState extends State<NotificationsScreen> {
         // ── Floating header pill ──
         Positioned(
           top: headerTop, left: 12, right: 12,
-          child: _StaggeredEntrance(
-            index: 0,
-            child: GlassHeader(
-              dark: dark,
-              child: Row(children: [
-                Text('Notifications',
-                  style: manrope(size: 17, weight: FontWeight.w700,
-                    color: GlassTokens.fg(dark), letterSpacing: -0.34)),
-                if (_unread > 0) ...[
-                  const SizedBox(width: 10),
-                  _CountBadge(count: _unread, dark: dark, big: true),
-                ],
-                const Spacer(),
-                if (_unread > 0)
-                  GestureDetector(
-                    onTap: _markAllRead,
-                    child: GlassCircleButton(dark: dark, icon: Icons.done_all, iconSize: 18),
-                  )
-                else
-                  GlassCircleButton(dark: dark, icon: Icons.settings_outlined, iconSize: 18),
-              ]),
-            ),
+          child: GlassHeader(
+            dark: dark,
+            child: Row(children: [
+              Text('Notifications'.tr(context),
+                style: manrope(size: 17, weight: FontWeight.w700,
+                  color: GlassTokens.fg(dark), letterSpacing: -0.34)),
+              if (_unread > 0) ...[
+                const SizedBox(width: 10),
+                _CountBadge(count: _unread, dark: dark, big: true),
+              ],
+              const Spacer(),
+              if (_unread > 0)
+                GestureDetector(
+                  onTap: _markAllRead,
+                  child: GlassCircleButton(dark: dark, icon: Icons.done_all, iconSize: 18),
+                )
+              else
+                GlassCircleButton(dark: dark, icon: Icons.settings_outlined, iconSize: 18),
+            ]),
           ),
         ),
 
@@ -415,21 +414,18 @@ class _NotificationsScreenState extends State<NotificationsScreen> {
     final fg = GlassTokens.fg(dark);
     final sub = GlassTokens.sub(dark);
     return Center(
-      child: _StaggeredEntrance(
-        index: 2,
-        child: Column(
-          mainAxisSize: MainAxisSize.min,
-          children: [
-            Icon(Icons.notifications_none_rounded, size: 56,
-              color: dark ? Colors.white.withOpacity(0.15) : Colors.black.withOpacity(0.12)),
-            const SizedBox(height: 16),
-            Text('No notifications yet',
-              style: manrope(size: 16, weight: FontWeight.w700, color: fg, letterSpacing: -0.2)),
-            const SizedBox(height: 6),
-            Text('When someone follows you, it\'ll show up here',
-              style: manrope(size: 13, weight: FontWeight.w500, color: sub, letterSpacing: -0.1)),
-          ],
-        ),
+      child: Column(
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          Icon(Icons.notifications_none_rounded, size: 56,
+            color: dark ? Colors.white.withOpacity(0.15) : Colors.black.withOpacity(0.12)),
+          const SizedBox(height: 16),
+          Text('No notifications yet'.tr(context),
+            style: manrope(size: 16, weight: FontWeight.w700, color: fg, letterSpacing: -0.2)),
+          const SizedBox(height: 6),
+          Text('When someone follows you, it\'ll show up here'.tr(context),
+            style: manrope(size: 13, weight: FontWeight.w500, color: sub, letterSpacing: -0.1)),
+        ],
       ),
     );
   }
@@ -438,31 +434,28 @@ class _NotificationsScreenState extends State<NotificationsScreen> {
     final fg = GlassTokens.fg(dark);
     final sub = GlassTokens.sub(dark);
     return Center(
-      child: _StaggeredEntrance(
-        index: 2,
-        child: Column(
-          mainAxisSize: MainAxisSize.min,
-          children: [
-            Icon(Icons.wifi_off_rounded, size: 48,
-              color: dark ? Colors.white.withOpacity(0.15) : Colors.black.withOpacity(0.12)),
-            const SizedBox(height: 16),
-            Text('Couldn\'t load notifications',
-              style: manrope(size: 15, weight: FontWeight.w700, color: fg)),
-            const SizedBox(height: 6),
-            Text('Check your connection and try again',
-              style: manrope(size: 13, weight: FontWeight.w500, color: sub)),
-            const SizedBox(height: 20),
-            GestureDetector(
-              onTap: _fetchNotifications,
-              child: Container(
-                padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 10),
-                decoration: BoxDecoration(
-                  borderRadius: BorderRadius.circular(999),
-                  color: dark ? Colors.white.withOpacity(0.10) : Colors.black.withOpacity(0.06),
-                ),
-                child: Text('Retry',
-                  style: manrope(size: 13, weight: FontWeight.w700, color: fg)),
+      child: Column(
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          Icon(Icons.wifi_off_rounded, size: 48,
+            color: dark ? Colors.white.withOpacity(0.15) : Colors.black.withOpacity(0.12)),
+          const SizedBox(height: 16),
+          Text('Couldn\'t load notifications'.tr(context),
+            style: manrope(size: 15, weight: FontWeight.w700, color: fg)),
+          const SizedBox(height: 6),
+          Text('Check your connection and try again'.tr(context),
+            style: manrope(size: 13, weight: FontWeight.w500, color: sub)),
+          const SizedBox(height: 20),
+          GestureDetector(
+            onTap: _fetchNotifications,
+            child: Container(
+              padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 10),
+              decoration: BoxDecoration(
+                borderRadius: BorderRadius.circular(999),
+                color: dark ? Colors.white.withOpacity(0.10) : Colors.black.withOpacity(0.06),
               ),
+              child: Text('Retry'.tr(context),
+                style: manrope(size: 13, weight: FontWeight.w700, color: fg)),
             ),
           ],
         ),
@@ -671,7 +664,7 @@ class _ActionButton extends StatelessWidget {
           borderRadius: BorderRadius.circular(999),
           color: dark ? Colors.white : const Color(0xFF0A0A0A),
         ),
-        child: Text(label,
+        child: Text(label.tr(context),
           style: manrope(size: 12, weight: FontWeight.w700,
             color: dark ? const Color(0xFF0A0A0A) : Colors.white, letterSpacing: -0.12)),
       );
@@ -684,7 +677,7 @@ class _ActionButton extends StatelessWidget {
         color: dark ? Colors.white.withOpacity(0.08) : Colors.white.withOpacity(0.6),
         border: Border.all(color: dark ? Colors.white.withOpacity(0.18) : Colors.black.withOpacity(0.10)),
       ),
-      child: Text(label, style: manrope(size: 12, weight: FontWeight.w700, color: fg, letterSpacing: -0.12)),
+      child: Text(label.tr(context), style: manrope(size: 12, weight: FontWeight.w700, color: fg, letterSpacing: -0.12)),
     );
   }
 }
@@ -719,7 +712,7 @@ class _Chip extends StatelessWidget {
                 : (dark ? Colors.white.withOpacity(0.10) : Colors.black.withOpacity(0.06))),
             ),
             child: Row(mainAxisSize: MainAxisSize.min, children: [
-              Text(label,
+              Text(label.tr(context),
                 style: manrope(size: 12.5, weight: active ? FontWeight.w700 : FontWeight.w600, color: fg, letterSpacing: -0.12)),
               if ((count ?? 0) > 0) ...[
                 const SizedBox(width: 6),

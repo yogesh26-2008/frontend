@@ -15,6 +15,7 @@ import 'package:shared_preferences/shared_preferences.dart';
 import '../models/chat_model.dart';
 import '../services/chat_service.dart';
 import '../services/fcm_service.dart';
+import '../l10n/app_localizations.dart';
 import 'glass_common.dart';
 
 // ── Quick emoji choices ───────────────────────────────────────
@@ -36,9 +37,20 @@ class ChatScreen extends StatefulWidget {
   State<ChatScreen> createState() => _ChatScreenState();
 }
 
-class _ChatScreenState extends State<ChatScreen> {
+class _ChatScreenState extends State<ChatScreen>
+    with TickerProviderStateMixin {
   final TextEditingController _textController = TextEditingController();
   final ScrollController _scrollController = ScrollController();
+
+  // ── Entrance animation ────────────────────────────────────
+  late final AnimationController _entranceCtrl;
+  late final Animation<double> _headerSlide;
+  late final Animation<double> _headerFade;
+  late final Animation<double> _bodyFade;
+  late final Animation<double> _bodyScale;
+  late final Animation<Offset> _inputSlide;
+  late final Animation<double> _inputFade;
+  late final Animation<double> _bgFade;
 
   List<ChatMessage> _messages = [];
   bool _isLoading = true;
@@ -55,6 +67,65 @@ class _ChatScreenState extends State<ChatScreen> {
   @override
   void initState() {
     super.initState();
+
+    // ── Setup entrance animation ────────────────────────────
+    _entranceCtrl = AnimationController(
+      vsync: this,
+      duration: const Duration(milliseconds: 800),
+    );
+
+    // Header: slides from -30px top → 0, with fade
+    _headerSlide = Tween<double>(begin: -30.0, end: 0.0).animate(
+      CurvedAnimation(
+        parent: _entranceCtrl,
+        curve: const Interval(0.0, 0.55, curve: Curves.easeOutCubic),
+      ),
+    );
+    _headerFade = Tween<double>(begin: 0.0, end: 1.0).animate(
+      CurvedAnimation(
+        parent: _entranceCtrl,
+        curve: const Interval(0.0, 0.45, curve: Curves.easeOut),
+      ),
+    );
+
+    // Message body: scale 0.92→1.0 + fade, slightly delayed
+    _bodyFade = Tween<double>(begin: 0.0, end: 1.0).animate(
+      CurvedAnimation(
+        parent: _entranceCtrl,
+        curve: const Interval(0.15, 0.65, curve: Curves.easeOut),
+      ),
+    );
+    _bodyScale = Tween<double>(begin: 0.92, end: 1.0).animate(
+      CurvedAnimation(
+        parent: _entranceCtrl,
+        curve: const Interval(0.15, 0.70, curve: Curves.easeOutCubic),
+      ),
+    );
+
+    // Input bar: slides from +40px bottom → 0, with fade
+    _inputSlide = Tween<Offset>(begin: const Offset(0, 40), end: Offset.zero).animate(
+      CurvedAnimation(
+        parent: _entranceCtrl,
+        curve: const Interval(0.25, 0.75, curve: Curves.easeOutCubic),
+      ),
+    );
+    _inputFade = Tween<double>(begin: 0.0, end: 1.0).animate(
+      CurvedAnimation(
+        parent: _entranceCtrl,
+        curve: const Interval(0.25, 0.65, curve: Curves.easeOut),
+      ),
+    );
+
+    // Background subtle fade
+    _bgFade = Tween<double>(begin: 0.0, end: 1.0).animate(
+      CurvedAnimation(
+        parent: _entranceCtrl,
+        curve: const Interval(0.0, 0.40, curve: Curves.easeOut),
+      ),
+    );
+
+    _entranceCtrl.forward();
+
     // Tell FCM service which conversation is active so it suppresses
     // redundant notifications while user is viewing this chat.
     FcmService.setActiveConversation(widget.conversation.id);
@@ -120,6 +191,7 @@ class _ChatScreenState extends State<ChatScreen> {
   void dispose() {
     // Clear active conversation so notifications resume for this chat
     FcmService.setActiveConversation(null);
+    _entranceCtrl.dispose();
     _textController.dispose();
     _scrollController.dispose();
     _messageSub.cancel();
@@ -464,13 +536,13 @@ class _ChatScreenState extends State<ChatScreen> {
     final confirm = await showDialog<bool>(
       context: context,
       builder: (ctx) => AlertDialog(
-        title: const Text('Delete Chat'),
-        content: const Text('Delete this conversation? This cannot be undone.'),
+        title: Text('Delete Chat'.tr(context)),
+        content: Text('Delete this conversation? This cannot be undone.'.tr(context)),
         actions: [
-          TextButton(onPressed: () => Navigator.pop(ctx, false), child: const Text('Cancel')),
+          TextButton(onPressed: () => Navigator.pop(ctx, false), child: Text('Cancel'.tr(context))),
           TextButton(
             onPressed: () => Navigator.pop(ctx, true),
-            child: const Text('Delete', style: TextStyle(color: Colors.red)),
+            child: Text('Delete'.tr(context), style: const TextStyle(color: Colors.red)),
           ),
         ],
       ),
@@ -498,13 +570,13 @@ class _ChatScreenState extends State<ChatScreen> {
     final confirm = await showDialog<bool>(
       context: context,
       builder: (ctx) => AlertDialog(
-        title: const Text('Delete Message'),
-        content: const Text('Delete this message for everyone?'),
+        title: Text('Delete Message'.tr(context)),
+        content: Text('Delete this message for everyone?'.tr(context)),
         actions: [
-          TextButton(onPressed: () => Navigator.pop(ctx, false), child: const Text('Cancel')),
+          TextButton(onPressed: () => Navigator.pop(ctx, false), child: Text('Cancel'.tr(context))),
           TextButton(
             onPressed: () => Navigator.pop(ctx, true),
-            child: const Text('Delete', style: TextStyle(color: Colors.red)),
+            child: Text('Delete'.tr(context), style: const TextStyle(color: Colors.red)),
           ),
         ],
       ),
@@ -540,25 +612,35 @@ class _ChatScreenState extends State<ChatScreen> {
     final otherUser    = widget.conversation.getOtherParticipant(widget.myUserId);
     final avatarLetter = otherUser.username.isNotEmpty ? otherUser.username[0].toUpperCase() : '?';
 
-    return Scaffold(
+    return AnimatedBuilder(
+      animation: _entranceCtrl,
+      builder: (context, _) => Scaffold(
       resizeToAvoidBottomInset: false,
       backgroundColor: widget.dark ? GlassTokens.bgDark : GlassTokens.bgLight,
       body: Stack(children: [
-        GlassBackdrop(dark: widget.dark),
+        Opacity(
+          opacity: _bgFade.value,
+          child: GlassBackdrop(dark: widget.dark),
+        ),
 
         // ── Messages list ──────────────────────────────────────
         Positioned(
           top: headerTop + headerH,
           bottom: effectiveInputH + 16 + bottomPad + navPad,
           left: 0, right: 0,
-          child: _isLoading
+          child: Opacity(
+            opacity: _bodyFade.value,
+            child: Transform.scale(
+              scale: _bodyScale.value,
+              alignment: Alignment.center,
+              child: _isLoading
               ? const Center(child: CircularProgressIndicator())
               : _hasError
                   ? Center(
                       child: Column(mainAxisSize: MainAxisSize.min, children: [
-                        Text('Could not load messages', style: manrope(size: 14, color: sub)),
+                        Text('Could not load messages'.tr(context), style: manrope(size: 14, color: sub)),
                         const SizedBox(height: 8),
-                        TextButton(onPressed: _loadMessages, child: const Text('Retry')),
+                        TextButton(onPressed: _loadMessages, child: Text('Retry'.tr(context))),
                       ]),
                     )
                   : ListView.builder(
@@ -610,12 +692,16 @@ class _ChatScreenState extends State<ChatScreen> {
                         );
                       },
                     ),
+            ),
+          ),
         ),
 
         // ── Header ─────────────────────────────────────────────
         Positioned(
-          top: headerTop, left: 12, right: 12,
-          child: GlassHeader(
+          top: headerTop + _headerSlide.value, left: 12, right: 12,
+          child: Opacity(
+            opacity: _headerFade.value,
+            child: GlassHeader(
             dark: widget.dark,
             height: headerH,
             padding: const EdgeInsets.symmetric(horizontal: 6),
@@ -669,13 +755,18 @@ class _ChatScreenState extends State<ChatScreen> {
               ),
             ]),
           ),
+          ),
         ),
 
         // ── Input bar + reply strip ─────────────────────────────
         Positioned(
           bottom: bottomPad + navPad + 8,
           left: 12, right: 12,
-          child: Column(
+          child: Transform.translate(
+            offset: _inputSlide.value,
+            child: Opacity(
+              opacity: _inputFade.value,
+              child: Column(
             mainAxisSize: MainAxisSize.min,
             children: [
 
@@ -741,9 +832,12 @@ class _ChatScreenState extends State<ChatScreen> {
                 ),
               ),
             ],
+              ),
+            ),
           ),
         ),
       ]),
+    ),
     );
   }
 }
@@ -815,7 +909,7 @@ class _ReplyPreview extends StatelessWidget {
                 crossAxisAlignment: CrossAxisAlignment.start,
                 mainAxisAlignment: MainAxisAlignment.center,
                 children: [
-                  Text('Replying to',
+                  Text('Replying to'.tr(context),
                       style: manrope(size: 10.5, weight: FontWeight.w700, color: labelColor)),
                   const SizedBox(height: 2),
                   Text(text,
@@ -1125,7 +1219,7 @@ class _ReplyQuote extends StatelessWidget {
               crossAxisAlignment: CrossAxisAlignment.start,
               mainAxisSize: MainAxisSize.min,
               children: [
-                Text('Replying to',
+                Text('Replying to'.tr(context),
                     style: manrope(size: 10, weight: FontWeight.w700, color: labelColor)),
                 const SizedBox(height: 2),
                 Text(text,
@@ -1167,7 +1261,7 @@ class _SheetTile extends StatelessWidget {
         child: Row(children: [
           Icon(icon, color: fg, size: 22),
           const SizedBox(width: 16),
-          Text(label,
+          Text(label.tr(context),
               style: manrope(size: 15, weight: FontWeight.w600, color: fg, letterSpacing: -0.2)),
         ]),
       ),
@@ -1289,7 +1383,7 @@ class _E2EBanner extends StatelessWidget {
           ),
           const SizedBox(height: 8),
           Text(
-            'End-to-end encrypted',
+            'End-to-end encrypted'.tr(context),
             style: manrope(
                 size: 12.5,
                 weight: FontWeight.w700,
@@ -1298,7 +1392,7 @@ class _E2EBanner extends StatelessWidget {
           ),
           const SizedBox(height: 4),
           Text(
-            'Messages are secured with end-to-end encryption.\nOnly you and the recipient can read them.',
+            'Messages are secured with end-to-end encryption.\nOnly you and the recipient can read them.'.tr(context),
             textAlign: TextAlign.center,
             style: manrope(
                 size: 11,

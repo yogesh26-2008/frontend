@@ -11,11 +11,13 @@ import '../notifications_screen.dart';
 import '../search_screen.dart';
 import '../shots_screen.dart';
 import '../profile_screen.dart';
+import '../user_profile_screen.dart' as user_profile;
 import '../chat_list_screen.dart';
 import '../create_post_screens.dart';
 import '../comments_screen.dart';
 import '../liked_by_screen.dart';
 import '../../services/cryptography_service.dart';
+import '../../l10n/app_localizations.dart';
 
 extension _ColorOp on Color {
   Color op(double opacity) => withOpacity(opacity);
@@ -261,6 +263,37 @@ class _HomeScreenState extends State<HomeScreen>
     );
   }
 
+  void _openChatScreen() async {
+    HapticFeedback.selectionClick();
+    if (_navOpen) {
+      setState(() => _navOpen = false);
+      _navCtrl.reverse();
+    }
+    final isDark = Theme.of(context).brightness == Brightness.dark;
+    await Navigator.of(context).push(
+      PageRouteBuilder(
+        pageBuilder: (_, animation, __) => ChatListScreen(dark: isDark),
+        transitionDuration: const Duration(milliseconds: 380),
+        reverseTransitionDuration: const Duration(milliseconds: 300),
+        transitionsBuilder: (_, animation, __, child) {
+          final curved = CurvedAnimation(
+            parent: animation,
+            curve: Curves.easeOutCubic,
+            reverseCurve: Curves.easeInCubic,
+          );
+          return SlideTransition(
+            position: Tween<Offset>(
+              begin: const Offset(1.0, 0.0), // native feel slide from right side
+              end: Offset.zero,
+            ).animate(curved),
+            child: FadeTransition(opacity: curved, child: child),
+          );
+        },
+      ),
+    );
+    _loadUnreadCount();
+  }
+
   void _openIsland() {
     _captureIslandRect();
     HapticFeedback.mediumImpact();
@@ -298,7 +331,14 @@ class _HomeScreenState extends State<HomeScreen>
     return Scaffold(
       extendBodyBehindAppBar: true,
       extendBody: true,
-      body: Stack(children: [
+      body: GestureDetector(
+        behavior: HitTestBehavior.translucent,
+        onHorizontalDragEnd: (details) {
+          if (details.primaryVelocity != null && details.primaryVelocity! > 150) {
+            _openChatScreen();
+          }
+        },
+        child: Stack(children: [
 
         Positioned.fill(child: Container(
           decoration: BoxDecoration(
@@ -479,7 +519,8 @@ class _HomeScreenState extends State<HomeScreen>
             isDark     : isDark,
             onClose    : _closeIsland,
           ),
-      ]),
+        ]),
+      ),
     );
   }
 }
@@ -538,7 +579,7 @@ class _StoryBubble extends StatelessWidget {
                           fontWeight: FontWeight.w600))),
                 )))),
           const SizedBox(height: 6),
-          Text(story.name, maxLines: 1, overflow: TextOverflow.ellipsis,
+          Text(story.name.tr(context), maxLines: 1, overflow: TextOverflow.ellipsis,
             textAlign: TextAlign.center,
             style: TextStyle(
               color: (isDark ? Colors.white : Colors.black)
@@ -610,6 +651,23 @@ class _PostCardState extends State<_PostCard> {
   @override
   void initState() { super.initState(); _likeCount = widget.post.likes; }
 
+  String _handleFor(String name) =>
+      name.trim().toLowerCase().replaceAll(RegExp(r'\s+'), '.');
+
+  void _openUserProfile() {
+    final p = widget.post;
+    HapticFeedback.selectionClick();
+    Navigator.of(context).push(
+      MaterialPageRoute(
+        builder: (_) => user_profile.ProfileScreen(
+          displayName: p.user,
+          handle: _handleFor(p.user),
+          initialFollowing: false,
+        ),
+      ),
+    );
+  }
+
   void _toggleLike() {
     HapticFeedback.lightImpact();
     setState(() { _liked = !_liked; _likeCount += _liked ? 1 : -1; });
@@ -634,17 +692,23 @@ class _PostCardState extends State<_PostCard> {
 
             Padding(padding: const EdgeInsets.fromLTRB(10, 8, 10, 6),
               child: Row(children: [
-                Container(width: 30, height: 30,
-                  decoration: BoxDecoration(shape: BoxShape.circle,
-                    color: p.userColor,
-                    border: Border.all(color: border, width: 0.8)),
-                  child: Center(child: Text(p.userInitials,
-                    style: const TextStyle(color: Colors.white,
-                        fontSize: 10, fontWeight: FontWeight.w600)))),
-                const SizedBox(width: 8),
-                Text(p.user, style: TextStyle(
-                    color: textPrimary, fontSize: 13,
-                    fontWeight: FontWeight.w600)),
+                GestureDetector(
+                  onTap: _openUserProfile,
+                  behavior: HitTestBehavior.opaque,
+                  child: Row(children: [
+                    Container(width: 30, height: 30,
+                      decoration: BoxDecoration(shape: BoxShape.circle,
+                        color: p.userColor,
+                        border: Border.all(color: border, width: 0.8)),
+                      child: Center(child: Text(p.userInitials,
+                        style: const TextStyle(color: Colors.white,
+                            fontSize: 10, fontWeight: FontWeight.w600)))),
+                    const SizedBox(width: 8),
+                    Text(p.user, style: TextStyle(
+                        color: textPrimary, fontSize: 13,
+                        fontWeight: FontWeight.w600)),
+                  ]),
+                ),
                 const Spacer(),
                 Text(p.timeAgo, style: TextStyle(
                     color: textSub, fontSize: 11)),
@@ -765,7 +829,7 @@ class _PostCardState extends State<_PostCard> {
               ])),
 
             Padding(padding: const EdgeInsets.fromLTRB(10, 6, 10, 0),
-              child: Text('$_likeCount likes', style: TextStyle(
+              child: Text('$_likeCount ${'likes'.tr(context)}', style: TextStyle(
                   color: textPrimary, fontSize: 13,
                   fontWeight: FontWeight.w600))),
 
@@ -1448,7 +1512,7 @@ class _IslandNotificationOverlayState
                     child: Stack(children: [
                       Opacity(
                         opacity: contentAlpha,
-                        child: NotificationsScreen(dark: widget.isDark),
+                        child: NotificationsScreen(dark: widget.isDark, onClose: widget.onClose),
                       ),
 
                       if (contentAlpha > 0.1)

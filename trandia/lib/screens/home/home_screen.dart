@@ -11,6 +11,7 @@ import '../notifications_screen.dart';
 import '../search_screen.dart';
 import '../shots_screen.dart';
 import '../profile_screen.dart';
+import '../user_profile_screen.dart' as user_profile;
 import '../chat_list_screen.dart';
 import '../create_post_screens.dart';
 import '../comments_screen.dart';
@@ -610,6 +611,23 @@ class _PostCardState extends State<_PostCard> {
   @override
   void initState() { super.initState(); _likeCount = widget.post.likes; }
 
+  String _handleFor(String name) =>
+      name.trim().toLowerCase().replaceAll(RegExp(r'\s+'), '.');
+
+  void _openUserProfile() {
+    final p = widget.post;
+    HapticFeedback.selectionClick();
+    Navigator.of(context).push(
+      MaterialPageRoute(
+        builder: (_) => user_profile.ProfileScreen(
+          displayName: p.user,
+          handle: _handleFor(p.user),
+          initialFollowing: false,
+        ),
+      ),
+    );
+  }
+
   void _toggleLike() {
     HapticFeedback.lightImpact();
     setState(() { _liked = !_liked; _likeCount += _liked ? 1 : -1; });
@@ -634,17 +652,23 @@ class _PostCardState extends State<_PostCard> {
 
             Padding(padding: const EdgeInsets.fromLTRB(10, 8, 10, 6),
               child: Row(children: [
-                Container(width: 30, height: 30,
-                  decoration: BoxDecoration(shape: BoxShape.circle,
-                    color: p.userColor,
-                    border: Border.all(color: border, width: 0.8)),
-                  child: Center(child: Text(p.userInitials,
-                    style: const TextStyle(color: Colors.white,
-                        fontSize: 10, fontWeight: FontWeight.w600)))),
-                const SizedBox(width: 8),
-                Text(p.user, style: TextStyle(
-                    color: textPrimary, fontSize: 13,
-                    fontWeight: FontWeight.w600)),
+                GestureDetector(
+                  onTap: _openUserProfile,
+                  behavior: HitTestBehavior.opaque,
+                  child: Row(children: [
+                    Container(width: 30, height: 30,
+                      decoration: BoxDecoration(shape: BoxShape.circle,
+                        color: p.userColor,
+                        border: Border.all(color: border, width: 0.8)),
+                      child: Center(child: Text(p.userInitials,
+                        style: const TextStyle(color: Colors.white,
+                            fontSize: 10, fontWeight: FontWeight.w600)))),
+                    const SizedBox(width: 8),
+                    Text(p.user, style: TextStyle(
+                        color: textPrimary, fontSize: 13,
+                        fontWeight: FontWeight.w600)),
+                  ]),
+                ),
                 const Spacer(),
                 Text(p.timeAgo, style: TextStyle(
                     color: textSub, fontSize: 11)),

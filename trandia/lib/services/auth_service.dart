@@ -43,18 +43,22 @@ class AuthService {
       if (e.code != 'email-already-in-use') rethrow;
 
       // ── Orphaned signup check ─────────────────────────────────────────────
-      // Try signing in with the same password to inspect the Firebase user.
+      // Firebase says email-already-in-use. Could be:
+      //   A) Same user retrying with SAME password → sign in, check, delete & recreate
+      //   B) Same user retrying with DIFFERENT password → sign in fails
+      //   C) Genuinely registered user → email exists in MongoDB
+
+      // Try signing in with the provided password.
       try {
         final existing = await FirebaseAuth.instance
             .signInWithEmailAndPassword(email: email, password: password);
 
         final fbUser = existing.user!;
-        await fbUser.reload(); // ensure emailVerified is current
+        await fbUser.reload();
         final refreshed = FirebaseAuth.instance.currentUser!;
 
         if (!refreshed.emailVerified) {
           // Unverified = orphaned / abandoned previous signup attempt.
-          // Safe to delete and start fresh.
           await refreshed.delete();
           final fresh = await FirebaseAuth.instance
               .createUserWithEmailAndPassword(email: email, password: password);
@@ -62,20 +66,76 @@ class AuthService {
           return email;
         }
 
-        // Email IS verified in Firebase → real account exists in MongoDB.
-        // Sign out and surface the original error.
+        // Email IS verified in Firebase → likely a real account.
         await FirebaseAuth.instance.signOut();
         rethrow;
       } on FirebaseAuthException catch (signInErr) {
-        // Wrong password → genuinely different user owns this email.
-        if (signInErr.code == 'wrong-password' ||
-            signInErr.code == 'invalid-credential' ||
-            signInErr.code == 'INVALID_LOGIN_CREDENTIALS') {
-          // Re-throw the original email-already-in-use so the UI
-          // shows the correct "already registered" message.
-          throw e;
+        if (signInErr.code != 'wrong-password' &&
+            signInErr.code != 'invalid-credential' &&
+            signInErr.code != 'INVALID_LOGIN_CREDENTIALS') {
+          rethrow;
         }
-        rethrow;
+
+        // Password mismatch — orphaned Firebase user with different password,
+        // OR genuinely registered user. We need to check MongoDB.
+        //
+        // Strategy: try backend cleanup → try check-email → fallback to reset
+        
+        // ── Attempt 1: Backend cleanup endpoint ─────────────────────────────
+        try {
+          final cleanupResult = await ApiService.post(
+            '/auth/cleanup-orphaned-firebase',
+            {'email': email},
+          );
+          if (cleanupResult['cleaned'] == true) {
+            final fresh = await FirebaseAuth.instance
+                .createUserWithEmailAndPassword(
+                    email: email, password: password);
+            await fresh.user!.sendEmailVerification();
+            return email;
+          }
+          // cleaned=false → orphan confirmed but couldn't delete
+          // Fall through to password reset
+        } on ApiException catch (apiErr) {
+          final msg = apiErr.message.toLowerCase();
+          if (msg.contains('already registered')) {
+            // 409 → email IS in MongoDB → genuinely registered
+            throw e;
+          }
+          // 404 "Not Found" or other → endpoint not available, try next
+        } catch (_) {}
+
+        // ── Attempt 2: Check email via backend ──────────────────────────────
+        try {
+          final checkResult = await ApiService.get(
+            '/users/check-email?email=${Uri.encodeComponent(email)}',
+          );
+          if (checkResult['exists'] == true) {
+            // Email IS in MongoDB → genuinely registered
+            throw e;
+          }
+          // Email NOT in MongoDB → definitely orphaned, fall through to reset
+        } on ApiException catch (apiErr) {
+          final msg = apiErr.message.toLowerCase();
+          if (msg.contains('already registered')) {
+            throw e;
+          }
+          // 404 or other → endpoint not available, fall through
+        } catch (_) {}
+
+        // ── Attempt 3: Password reset (last resort) ─────────────────────────
+        // We're fairly confident this is an orphaned Firebase user since both
+        // cleanup endpoints are unavailable (backend not deployed with them).
+        // Send a password reset email so the user can reclaim the account.
+        try {
+          await FirebaseAuth.instance.sendPasswordResetEmail(email: email);
+        } catch (_) {}
+        
+        throw const ApiException(
+          'A previous incomplete signup was found. We sent a password reset '
+          'email to your inbox. Please reset your password first, then '
+          'try signing up again with the new password.',
+        );
       }
     }
   }

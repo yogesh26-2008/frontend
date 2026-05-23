@@ -281,41 +281,47 @@ class _NotificationsScreenState extends State<NotificationsScreen> {
         // ── Floating header pill ──
         Positioned(
           top: headerTop, left: 12, right: 12,
-          child: GlassHeader(
-            dark: dark,
-            child: Row(children: [
-              Text('Notifications',
-                style: manrope(size: 17, weight: FontWeight.w700,
-                  color: GlassTokens.fg(dark), letterSpacing: -0.34)),
-              if (_unread > 0) ...[
-                const SizedBox(width: 10),
-                _CountBadge(count: _unread, dark: dark, big: true),
-              ],
-              const Spacer(),
-              if (_unread > 0)
-                GestureDetector(
-                  onTap: _markAllRead,
-                  child: GlassCircleButton(dark: dark, icon: Icons.done_all, iconSize: 18),
-                )
-              else
-                GlassCircleButton(dark: dark, icon: Icons.settings_outlined, iconSize: 18),
-            ]),
+          child: _StaggeredEntrance(
+            index: 0,
+            child: GlassHeader(
+              dark: dark,
+              child: Row(children: [
+                Text('Notifications',
+                  style: manrope(size: 17, weight: FontWeight.w700,
+                    color: GlassTokens.fg(dark), letterSpacing: -0.34)),
+                if (_unread > 0) ...[
+                  const SizedBox(width: 10),
+                  _CountBadge(count: _unread, dark: dark, big: true),
+                ],
+                const Spacer(),
+                if (_unread > 0)
+                  GestureDetector(
+                    onTap: _markAllRead,
+                    child: GlassCircleButton(dark: dark, icon: Icons.done_all, iconSize: 18),
+                  )
+                else
+                  GlassCircleButton(dark: dark, icon: Icons.settings_outlined, iconSize: 18),
+              ]),
+            ),
           ),
         ),
 
         // ── Filter chips ──
         Positioned(
           top: chipsTop, left: 0, right: 0,
-          child: SizedBox(
-            height: 30,
-            child: ListView(
-              scrollDirection: Axis.horizontal,
-              padding: const EdgeInsets.symmetric(horizontal: 12),
-              children: [
-                _Chip(label: 'All',      active: _filter=='All',      count: _unread, dark: dark, onTap: () => setState(() => _filter='All')),
-                const SizedBox(width: 8),
-                _Chip(label: 'Follows',  active: _filter=='Follows',  dark: dark, onTap: () => setState(() => _filter='Follows')),
-              ],
+          child: _StaggeredEntrance(
+            index: 1,
+            child: SizedBox(
+              height: 30,
+              child: ListView(
+                scrollDirection: Axis.horizontal,
+                padding: const EdgeInsets.symmetric(horizontal: 12),
+                children: [
+                  _Chip(label: 'All',      active: _filter=='All',      count: _unread, dark: dark, onTap: () => setState(() => _filter='All')),
+                  const SizedBox(width: 8),
+                  _Chip(label: 'Follows',  active: _filter=='Follows',  dark: dark, onTap: () => setState(() => _filter='Follows')),
+                ],
+              ),
             ),
           ),
         ),
@@ -355,48 +361,51 @@ class _NotificationsScreenState extends State<NotificationsScreen> {
     return ListView.builder(
       padding: const EdgeInsets.only(top: 16, left: 10, right: 10),
       itemCount: 6,
-      itemBuilder: (_, i) => Padding(
-        padding: const EdgeInsets.only(bottom: 10),
-        child: Container(
-          height: _kCardHeight,
-          decoration: BoxDecoration(
-            color: shimmerBase,
-            borderRadius: BorderRadius.circular(22),
+      itemBuilder: (_, i) => _StaggeredEntrance(
+        index: i + 2,
+        child: Padding(
+          padding: const EdgeInsets.only(bottom: 10),
+          child: Container(
+            height: _kCardHeight,
+            decoration: BoxDecoration(
+              color: shimmerBase,
+              borderRadius: BorderRadius.circular(22),
+            ),
+            child: Row(children: [
+              const SizedBox(width: 14),
+              Container(
+                width: 44, height: 44,
+                decoration: BoxDecoration(
+                  shape: BoxShape.circle,
+                  color: dark ? Colors.white.withOpacity(0.08) : Colors.black.withOpacity(0.07),
+                ),
+              ),
+              const SizedBox(width: 12),
+              Expanded(
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  mainAxisSize: MainAxisSize.min,
+                  children: [
+                    Container(
+                      height: 12, width: 120,
+                      decoration: BoxDecoration(
+                        color: dark ? Colors.white.withOpacity(0.08) : Colors.black.withOpacity(0.07),
+                        borderRadius: BorderRadius.circular(6),
+                      ),
+                    ),
+                    const SizedBox(height: 8),
+                    Container(
+                      height: 10, width: 80,
+                      decoration: BoxDecoration(
+                        color: dark ? Colors.white.withOpacity(0.05) : Colors.black.withOpacity(0.04),
+                        borderRadius: BorderRadius.circular(5),
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+            ]),
           ),
-          child: Row(children: [
-            const SizedBox(width: 14),
-            Container(
-              width: 44, height: 44,
-              decoration: BoxDecoration(
-                shape: BoxShape.circle,
-                color: dark ? Colors.white.withOpacity(0.08) : Colors.black.withOpacity(0.07),
-              ),
-            ),
-            const SizedBox(width: 12),
-            Expanded(
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                mainAxisSize: MainAxisSize.min,
-                children: [
-                  Container(
-                    height: 12, width: 120,
-                    decoration: BoxDecoration(
-                      color: dark ? Colors.white.withOpacity(0.08) : Colors.black.withOpacity(0.07),
-                      borderRadius: BorderRadius.circular(6),
-                    ),
-                  ),
-                  const SizedBox(height: 8),
-                  Container(
-                    height: 10, width: 80,
-                    decoration: BoxDecoration(
-                      color: dark ? Colors.white.withOpacity(0.05) : Colors.black.withOpacity(0.04),
-                      borderRadius: BorderRadius.circular(5),
-                    ),
-                  ),
-                ],
-              ),
-            ),
-          ]),
         ),
       ),
     );
@@ -406,18 +415,21 @@ class _NotificationsScreenState extends State<NotificationsScreen> {
     final fg = GlassTokens.fg(dark);
     final sub = GlassTokens.sub(dark);
     return Center(
-      child: Column(
-        mainAxisSize: MainAxisSize.min,
-        children: [
-          Icon(Icons.notifications_none_rounded, size: 56,
-            color: dark ? Colors.white.withOpacity(0.15) : Colors.black.withOpacity(0.12)),
-          const SizedBox(height: 16),
-          Text('No notifications yet',
-            style: manrope(size: 16, weight: FontWeight.w700, color: fg, letterSpacing: -0.2)),
-          const SizedBox(height: 6),
-          Text('When someone follows you, it\'ll show up here',
-            style: manrope(size: 13, weight: FontWeight.w500, color: sub, letterSpacing: -0.1)),
-        ],
+      child: _StaggeredEntrance(
+        index: 2,
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            Icon(Icons.notifications_none_rounded, size: 56,
+              color: dark ? Colors.white.withOpacity(0.15) : Colors.black.withOpacity(0.12)),
+            const SizedBox(height: 16),
+            Text('No notifications yet',
+              style: manrope(size: 16, weight: FontWeight.w700, color: fg, letterSpacing: -0.2)),
+            const SizedBox(height: 6),
+            Text('When someone follows you, it\'ll show up here',
+              style: manrope(size: 13, weight: FontWeight.w500, color: sub, letterSpacing: -0.1)),
+          ],
+        ),
       ),
     );
   }
@@ -426,31 +438,34 @@ class _NotificationsScreenState extends State<NotificationsScreen> {
     final fg = GlassTokens.fg(dark);
     final sub = GlassTokens.sub(dark);
     return Center(
-      child: Column(
-        mainAxisSize: MainAxisSize.min,
-        children: [
-          Icon(Icons.wifi_off_rounded, size: 48,
-            color: dark ? Colors.white.withOpacity(0.15) : Colors.black.withOpacity(0.12)),
-          const SizedBox(height: 16),
-          Text('Couldn\'t load notifications',
-            style: manrope(size: 15, weight: FontWeight.w700, color: fg)),
-          const SizedBox(height: 6),
-          Text('Check your connection and try again',
-            style: manrope(size: 13, weight: FontWeight.w500, color: sub)),
-          const SizedBox(height: 20),
-          GestureDetector(
-            onTap: _fetchNotifications,
-            child: Container(
-              padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 10),
-              decoration: BoxDecoration(
-                borderRadius: BorderRadius.circular(999),
-                color: dark ? Colors.white.withOpacity(0.10) : Colors.black.withOpacity(0.06),
+      child: _StaggeredEntrance(
+        index: 2,
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            Icon(Icons.wifi_off_rounded, size: 48,
+              color: dark ? Colors.white.withOpacity(0.15) : Colors.black.withOpacity(0.12)),
+            const SizedBox(height: 16),
+            Text('Couldn\'t load notifications',
+              style: manrope(size: 15, weight: FontWeight.w700, color: fg)),
+            const SizedBox(height: 6),
+            Text('Check your connection and try again',
+              style: manrope(size: 13, weight: FontWeight.w500, color: sub)),
+            const SizedBox(height: 20),
+            GestureDetector(
+              onTap: _fetchNotifications,
+              child: Container(
+                padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 10),
+                decoration: BoxDecoration(
+                  borderRadius: BorderRadius.circular(999),
+                  color: dark ? Colors.white.withOpacity(0.10) : Colors.black.withOpacity(0.06),
+                ),
+                child: Text('Retry',
+                  style: manrope(size: 13, weight: FontWeight.w700, color: fg)),
               ),
-              child: Text('Retry',
-                style: manrope(size: 13, weight: FontWeight.w700, color: fg)),
             ),
-          ),
-        ],
+          ],
+        ),
       ),
     );
   }
@@ -459,11 +474,14 @@ class _NotificationsScreenState extends State<NotificationsScreen> {
   Widget _buildCascadeCard(NfItem item, int i, double scrollOffset, bool dark, double viewportHeight, double listStartGlobalY) {
     final stride = _kCardHeight + _kCardGap;
     final cardTop = i * stride;
-    final card = _NfCardInner(
-      n: item,
-      i: i,
-      dark: dark,
-      onDelete: () => _deleteNotification(item),
+    final card = _StaggeredEntrance(
+      index: i + 2,
+      child: _NfCardInner(
+        n: item,
+        i: i,
+        dark: dark,
+        onDelete: () => _deleteNotification(item),
+      ),
     );
 
     final screenY = listStartGlobalY - scrollOffset + cardTop;
@@ -741,6 +759,78 @@ class _CountBadge extends StatelessWidget {
           letterSpacing: -0.1,
           height: 1,
         )),
+    );
+  }
+}
+
+class _StaggeredEntrance extends StatefulWidget {
+  final Widget child;
+  final int index;
+  final Duration delay;
+
+  const _StaggeredEntrance({
+    super.key,
+    required this.child,
+    required this.index,
+    this.delay = const Duration(milliseconds: 35),
+  });
+
+  @override
+  State<_StaggeredEntrance> createState() => _StaggeredEntranceState();
+}
+
+class _StaggeredEntranceState extends State<_StaggeredEntrance>
+    with SingleTickerProviderStateMixin {
+  late AnimationController _controller;
+  late Animation<double> _opacity;
+  late Animation<Offset> _slide;
+
+  @override
+  void initState() {
+    super.initState();
+    _controller = AnimationController(
+      vsync: this,
+      duration: const Duration(milliseconds: 500),
+    );
+
+    _opacity = Tween<double>(begin: 0.0, end: 1.0).animate(
+      CurvedAnimation(
+        parent: _controller,
+        curve: Curves.easeOut,
+      ),
+    );
+
+    _slide = Tween<Offset>(
+      begin: const Offset(0.0, 0.15), // subtle slide up
+      end: Offset.zero,
+    ).animate(
+      CurvedAnimation(
+        parent: _controller,
+        curve: const Cubic(0.175, 0.885, 0.32, 1.1), // smooth springy easeOutBack
+      ),
+    );
+
+    Future.delayed(widget.delay * widget.index, () {
+      if (mounted) {
+        _controller.forward();
+      }
+    });
+  }
+
+  @override
+  void dispose() {
+    _controller.dispose();
+    super.dispose();
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    return FadeTransition(
+      opacity: _opacity,
+      child: SlideTransition(
+        position: _slide,
+        child: widget.child,
+      ),
     );
   }
 }

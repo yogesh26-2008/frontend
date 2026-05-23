@@ -13,6 +13,7 @@ import '../shots_screen.dart';
 import '../profile_screen.dart';
 import '../chat_list_screen.dart';
 import '../create_post_screens.dart';
+import '../comments_screen.dart';
 import '../../services/cryptography_service.dart';
 
 extension _ColorOp on Color {
@@ -690,7 +691,36 @@ class _PostCardState extends State<_PostCard> {
                 const SizedBox(width: 16),
 
                 GestureDetector(
-                  onTap: () => HapticFeedback.lightImpact(),
+                  onTap: () {
+                    HapticFeedback.selectionClick();
+                    Navigator.of(context).push(
+                      PageRouteBuilder(
+                        pageBuilder: (_, animation, __) => CommentsScreen(
+                          dark: dark,
+                          postUser: p.user,
+                          postDescription: p.description,
+                          postInitials: p.userInitials,
+                          postUserColor: p.userColor,
+                        ),
+                        transitionDuration: const Duration(milliseconds: 380),
+                        reverseTransitionDuration: const Duration(milliseconds: 300),
+                        transitionsBuilder: (_, animation, __, child) {
+                          final curved = CurvedAnimation(
+                            parent: animation,
+                            curve: Curves.easeOutCubic,
+                            reverseCurve: Curves.easeInCubic,
+                          );
+                          return SlideTransition(
+                            position: Tween<Offset>(
+                              begin: const Offset(0, 0.06),
+                              end: Offset.zero,
+                            ).animate(curved),
+                            child: FadeTransition(opacity: curved, child: child),
+                          );
+                        },
+                      ),
+                    );
+                  },
                   child: SizedBox(width: 26, height: 26,
                     child: CustomPaint(
                         painter: _CommentBubblePainter(color: iconCol)))),

@@ -106,7 +106,8 @@ const int    _kMaxStack   = 4;
 
 class NotificationsScreen extends StatefulWidget {
   final bool dark;
-  const NotificationsScreen({super.key, required this.dark});
+  final VoidCallback? onClose;
+  const NotificationsScreen({super.key, required this.dark, this.onClose});
 
   @override
   State<NotificationsScreen> createState() => _NotificationsScreenState();

@@ -155,6 +155,7 @@ class _ChatListScreenState extends State<ChatListScreen> with WidgetsBindingObse
               padding: const EdgeInsets.symmetric(horizontal: 12),
               child: GlassHeader(
                 dark: widget.dark,
+                padding: const EdgeInsets.symmetric(horizontal: 6),
                 child: Row(children: [
                   Text('Messages'.tr(context),
                       style: manrope(

@@ -426,6 +426,8 @@ class _SearchScreenState extends State<SearchScreen> {
                             Navigator.of(context).push(
                               PageRouteBuilder(
                                 pageBuilder: (_, animation, __) => ProfileScreen(
+                                  userId: u.id,
+                                  username: u.username,
                                   displayName: u.name,
                                   handle: u.username,
                                   followers: u.followersCount > 999

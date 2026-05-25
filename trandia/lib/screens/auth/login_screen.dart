@@ -14,6 +14,7 @@ import '../home/home_screen.dart';
 import '../../services/auth_service.dart';
 import '../../services/api_service.dart';
 import '../../l10n/app_localizations.dart';
+import '../../utils/error_dialog.dart';
 
 class LoginScreen extends StatefulWidget {
   const LoginScreen({super.key});
@@ -37,9 +38,7 @@ class _LoginScreenState extends State<LoginScreen> {
 
   void _showError(String message) {
     if (!mounted) return;
-    ScaffoldMessenger.of(context).showSnackBar(
-      SnackBar(content: Text(message), backgroundColor: Colors.redAccent),
-    );
+    showErrorDialog(context, message: message);
   }
 
   Future<void> _handleSignIn() async {

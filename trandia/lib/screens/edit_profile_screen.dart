@@ -7,6 +7,7 @@ import 'glass_common.dart';
 import '../models/chat_model.dart';
 import '../services/user_service.dart';
 import '../services/api_service.dart';
+import '../utils/error_dialog.dart';
 
 class EditProfileScreen extends StatefulWidget {
   final bool dark;

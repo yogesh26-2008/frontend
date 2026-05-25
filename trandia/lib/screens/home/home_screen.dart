@@ -2,9 +2,12 @@ import 'dart:async';
 import 'dart:math' as math;
 import 'dart:ui' as ui;
 import 'package:cached_network_image/cached_network_image.dart';
+import 'package:connectivity_plus/connectivity_plus.dart';
 import 'package:firebase_messaging/firebase_messaging.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
+import 'package:video_player/video_player.dart';
+import 'package:visibility_detector/visibility_detector.dart';
 import '../../services/fcm_service.dart';
 import '../../services/chat_service.dart';
 import '../../services/auth_service.dart';
@@ -114,6 +117,8 @@ class _HomeScreenState extends State<HomeScreen>
       duration: const Duration(milliseconds: 520),
     );
 
+    VisibilityDetectorController.instance.updateInterval =
+        const Duration(milliseconds: 400);
     _scrollCtrl.addListener(_onScroll);
     WidgetsBinding.instance.addPostFrameCallback((_) {
       FcmService.setupForHomeScreen();
@@ -842,35 +847,26 @@ class _PostCardState extends State<_PostCard> {
           ])),
 
         // ── Media ────────────────────────────────────
-        AspectRatio(aspectRatio: p.aspectRatio,
-          child: Stack(fit: StackFit.expand, children: [
-            CachedNetworkImage(
-              imageUrl: p.isVideo && p.thumbnailUrl != null
-                  ? p.thumbnailUrl!
-                  : p.mediaUrl,
-              fit: BoxFit.cover,
-              placeholder: (_, __) => Container(
-                color: (dark ? Colors.white : Colors.black).withOpacity(0.05)),
-              errorWidget: (_, __, ___) => Container(
-                color: (dark ? Colors.white : Colors.black).withOpacity(0.05),
-                child: Icon(Icons.broken_image_outlined,
-                  color: (dark ? Colors.white : Colors.black).withOpacity(0.25))),
-            ),
-            if (p.isVideo)
-              Center(child: Container(
-                width: 48, height: 48,
-                decoration: BoxDecoration(
-                  shape: BoxShape.circle,
-                  color: Colors.black.op(0.40),
-                  border: Border.all(color: Colors.white.op(0.60), width: 1.5)),
-                child: const Icon(Icons.play_arrow_rounded,
-                    color: Colors.white, size: 26))),
-            Container(decoration: BoxDecoration(
-              gradient: LinearGradient(
-                begin: Alignment.topCenter,
-                end: Alignment.bottomCenter,
-                colors: [Colors.transparent, Colors.black.op(0.18)]))),
-          ])),
+        p.isVideo
+            ? _VideoCard(post: p, isDark: dark)
+            : AspectRatio(aspectRatio: p.aspectRatio,
+                child: Stack(fit: StackFit.expand, children: [
+                  CachedNetworkImage(
+                    imageUrl: p.mediaUrl,
+                    fit: BoxFit.cover,
+                    placeholder: (_, __) => Container(
+                      color: (dark ? Colors.white : Colors.black).withOpacity(0.05)),
+                    errorWidget: (_, __, ___) => Container(
+                      color: (dark ? Colors.white : Colors.black).withOpacity(0.05),
+                      child: Icon(Icons.broken_image_outlined,
+                        color: (dark ? Colors.white : Colors.black).withOpacity(0.25))),
+                  ),
+                  Container(decoration: BoxDecoration(
+                    gradient: LinearGradient(
+                      begin: Alignment.topCenter,
+                      end: Alignment.bottomCenter,
+                      colors: [Colors.transparent, Colors.black.op(0.18)]))),
+                ])),
 
         // ── Actions ──────────────────────────────────
         Padding(padding: const EdgeInsets.fromLTRB(10, 8, 10, 0),
@@ -993,6 +989,233 @@ class _PostCardState extends State<_PostCard> {
 
         if (p.caption.isEmpty) const SizedBox(height: 10),
       ]),
+    );
+  }
+}
+
+// ═════════════════════════════════════════════════════
+//  VIDEO CARD  —  inline autoplay, battery + data safe
+// ═════════════════════════════════════════════════════
+class _VideoCard extends StatefulWidget {
+  final PostModel post;
+  final bool      isDark;
+  const _VideoCard({required this.post, required this.isDark});
+  @override
+  State<_VideoCard> createState() => _VideoCardState();
+}
+
+class _VideoCardState extends State<_VideoCard> {
+  VideoPlayerController? _ctrl;
+  bool _initialized    = false;
+  bool _muted          = true;
+  bool _manualPause    = false;   // user double-tapped to pause
+  bool _dataSaver      = false;   // on mobile data → no autoplay
+  bool _showOverlay    = false;   // brief play/pause icon flash
+
+  @override
+  void initState() {
+    super.initState();
+    _checkConnectivity();
+  }
+
+  Future<void> _checkConnectivity() async {
+    try {
+      final result = await Connectivity().checkConnectivity();
+      if (mounted) {
+        // Any mobile data type → data-saver on; WiFi / ethernet → off
+        final onMobile = result.contains(ConnectivityResult.mobile);
+        setState(() => _dataSaver = onMobile);
+      }
+    } catch (_) {}
+  }
+
+  Future<void> _initAndPlay() async {
+    if (_ctrl != null) return;
+    final ctrl = VideoPlayerController.networkUrl(
+      Uri.parse(widget.post.mediaUrl),
+      videoPlayerOptions: VideoPlayerOptions(mixWithOthers: false),
+    );
+    _ctrl = ctrl;
+    try {
+      await ctrl.initialize();
+    } catch (_) {
+      if (mounted) setState(() {});
+      return;
+    }
+    if (!mounted) { ctrl.dispose(); _ctrl = null; return; }
+    ctrl.setLooping(true);
+    ctrl.setVolume(_muted ? 0.0 : 1.0);
+    setState(() => _initialized = true);
+    if (!_manualPause) ctrl.play();
+  }
+
+  void _onVisibilityChanged(VisibilityInfo info) {
+    final visible = info.visibleFraction >= 0.65;
+    if (visible) {
+      if (!_initialized && !_dataSaver) {
+        _initAndPlay();
+      } else if (_initialized && !_manualPause) {
+        _ctrl?.play();
+      }
+    } else {
+      if (_initialized) {
+        _ctrl?.pause();
+        // Clear manual-pause state so next scroll-in auto-plays
+        if (_manualPause) _manualPause = false;
+      }
+    }
+  }
+
+  void _onDoubleTap() {
+    HapticFeedback.lightImpact();
+    if (!_initialized) {
+      _dataSaver = false;
+      _initAndPlay();
+      return;
+    }
+    final playing = _ctrl?.value.isPlaying ?? false;
+    if (playing) {
+      _ctrl?.pause();
+      _manualPause = true;
+    } else {
+      _ctrl?.play();
+      _manualPause = false;
+    }
+    setState(() => _showOverlay = true);
+    Future.delayed(const Duration(milliseconds: 700), () {
+      if (mounted) setState(() => _showOverlay = false);
+    });
+  }
+
+  void _onTapManualPlay() {
+    _dataSaver = false;
+    _manualPause = false;
+    if (!_initialized) {
+      _initAndPlay();
+    } else {
+      _ctrl?.play();
+      setState(() {});
+    }
+  }
+
+  void _toggleMute() {
+    setState(() => _muted = !_muted);
+    _ctrl?.setVolume(_muted ? 0.0 : 1.0);
+  }
+
+  @override
+  void dispose() {
+    _ctrl?.dispose();
+    super.dispose();
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final thumbnailUrl = widget.post.thumbnailUrl ?? widget.post.mediaUrl;
+    final isPlaying    = _ctrl?.value.isPlaying ?? false;
+
+    return VisibilityDetector(
+      key: Key('vid_${widget.post.id}'),
+      onVisibilityChanged: _onVisibilityChanged,
+      child: AspectRatio(
+        aspectRatio: widget.post.aspectRatio,
+        child: GestureDetector(
+          onDoubleTap: _onDoubleTap,
+          child: Stack(fit: StackFit.expand, children: [
+
+            // ── Thumbnail (always shown until video ready) ──
+            CachedNetworkImage(
+              imageUrl: thumbnailUrl,
+              fit: BoxFit.cover,
+              placeholder: (_, __) => Container(color: Colors.black12),
+              errorWidget: (_, __, ___) => Container(
+                color: Colors.black12,
+                child: const Icon(Icons.broken_image_outlined,
+                    color: Colors.white30)),
+            ),
+
+            // ── Video frame (on top once initialized) ──────
+            if (_initialized && _ctrl != null)
+              VideoPlayer(_ctrl!),
+
+            // ── Bottom gradient ────────────────────────────
+            Positioned.fill(child: IgnorePointer(child: DecoratedBox(
+              decoration: BoxDecoration(
+                gradient: LinearGradient(
+                  begin: Alignment.topCenter,
+                  end: Alignment.bottomCenter,
+                  colors: [Colors.transparent, Colors.black.withOpacity(0.22)],
+                )),
+            ))),
+
+            // ── Data-saver: big manual play button ─────────
+            if (_dataSaver && !_initialized)
+              Center(child: GestureDetector(
+                onTap: _onTapManualPlay,
+                child: Container(
+                  width: 56, height: 56,
+                  decoration: BoxDecoration(
+                    shape: BoxShape.circle,
+                    color: Colors.black.withOpacity(0.55),
+                    border: Border.all(color: Colors.white.withOpacity(0.7), width: 1.5)),
+                  child: const Icon(Icons.play_arrow_rounded,
+                      color: Colors.white, size: 30)),
+              )),
+
+            // ── Loading spinner (WiFi, waiting for init) ───
+            if (!_dataSaver && !_initialized)
+              const Center(child: SizedBox(
+                width: 28, height: 28,
+                child: CircularProgressIndicator(
+                    color: Colors.white54, strokeWidth: 2))),
+
+            // ── Double-tap play/pause flash overlay ────────
+            if (_showOverlay)
+              Center(child: AnimatedOpacity(
+                opacity: _showOverlay ? 1.0 : 0.0,
+                duration: const Duration(milliseconds: 150),
+                child: Container(
+                  width: 64, height: 64,
+                  decoration: BoxDecoration(
+                    shape: BoxShape.circle,
+                    color: Colors.black.withOpacity(0.55)),
+                  child: Icon(
+                    isPlaying ? Icons.pause_rounded : Icons.play_arrow_rounded,
+                    color: Colors.white, size: 34),
+                ),
+              )),
+
+            // ── Mute / unmute button (bottom-right) ────────
+            if (_initialized)
+              Positioned(bottom: 10, right: 10,
+                child: GestureDetector(
+                  onTap: _toggleMute,
+                  child: Container(
+                    width: 30, height: 30,
+                    decoration: BoxDecoration(
+                      shape: BoxShape.circle,
+                      color: Colors.black.withOpacity(0.50)),
+                    child: Icon(
+                      _muted ? Icons.volume_off_rounded : Icons.volume_up_rounded,
+                      color: Colors.white, size: 16)),
+                )),
+
+            // ── Progress bar (bottom edge) ─────────────────
+            if (_initialized && _ctrl != null)
+              Positioned(bottom: 0, left: 0, right: 0,
+                child: VideoProgressIndicator(
+                  _ctrl!,
+                  allowScrubbing: true,
+                  padding: EdgeInsets.zero,
+                  colors: VideoProgressColors(
+                    playedColor: Colors.white,
+                    bufferedColor: Colors.white.withOpacity(0.30),
+                    backgroundColor: Colors.transparent,
+                  ),
+                )),
+          ]),
+        ),
+      ),
     );
   }
 }

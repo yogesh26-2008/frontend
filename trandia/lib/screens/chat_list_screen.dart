@@ -133,6 +133,16 @@ class _ChatListScreenState extends State<ChatListScreen> with WidgetsBindingObse
     }
   }
 
+  void _handleBackSwipe(DragEndDetails details) {
+    final velocity = details.primaryVelocity;
+    if (velocity == null || velocity > -150 || !Navigator.of(context).canPop()) {
+      return;
+    }
+
+    HapticFeedback.selectionClick();
+    Navigator.of(context).pop();
+  }
+
   @override
   Widget build(BuildContext context) {
     final fg  = GlassTokens.fg(widget.dark);
@@ -142,13 +152,16 @@ class _ChatListScreenState extends State<ChatListScreen> with WidgetsBindingObse
 
     return Scaffold(
       backgroundColor: widget.dark ? GlassTokens.bgDark : GlassTokens.bgLight,
-      body: Stack(children: [
-        GlassBackdrop(dark: widget.dark),
+      body: GestureDetector(
+        behavior: HitTestBehavior.translucent,
+        onHorizontalDragEnd: _handleBackSwipe,
+        child: Stack(children: [
+          GlassBackdrop(dark: widget.dark),
 
-        Column(
-          crossAxisAlignment: CrossAxisAlignment.stretch,
-          children: [
-            SizedBox(height: topPad + 10),
+          Column(
+            crossAxisAlignment: CrossAxisAlignment.stretch,
+            children: [
+              SizedBox(height: topPad + 10),
 
             // Header pill
             Padding(
@@ -324,10 +337,11 @@ class _ChatListScreenState extends State<ChatListScreen> with WidgetsBindingObse
                             },
                           ),
                         ),
-            ),
-          ],
-        ),
-      ]),
+              ),
+            ],
+          ),
+        ]),
+      ),
     );
   }
 }

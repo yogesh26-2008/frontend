@@ -273,13 +273,13 @@ class _HomeScreenState extends State<HomeScreen>
     await Navigator.of(context).push(
       PageRouteBuilder(
         pageBuilder: (_, animation, __) => ChatListScreen(dark: isDark),
-        transitionDuration: const Duration(milliseconds: 380),
-        reverseTransitionDuration: const Duration(milliseconds: 300),
+        transitionDuration: const Duration(milliseconds: 260),
+        reverseTransitionDuration: const Duration(milliseconds: 220),
         transitionsBuilder: (_, animation, __, child) {
           final curved = CurvedAnimation(
             parent: animation,
-            curve: Curves.easeOutCubic,
-            reverseCurve: Curves.easeInCubic,
+            curve: Curves.easeOutQuart,
+            reverseCurve: Curves.easeInQuart,
           );
           return SlideTransition(
             position: Tween<Offset>(
@@ -429,17 +429,17 @@ class _HomeScreenState extends State<HomeScreen>
                   await Navigator.of(context).push(
                     PageRouteBuilder(
                       pageBuilder: (_, animation, __) => ChatListScreen(dark: isDark),
-                      transitionDuration: const Duration(milliseconds: 380),
-                      reverseTransitionDuration: const Duration(milliseconds: 300),
+                      transitionDuration: const Duration(milliseconds: 260),
+                      reverseTransitionDuration: const Duration(milliseconds: 220),
                       transitionsBuilder: (_, animation, __, child) {
                         final curved = CurvedAnimation(
                           parent: animation,
-                          curve: Curves.easeOutCubic,
-                          reverseCurve: Curves.easeInCubic,
+                          curve: Curves.easeOutQuart,
+                          reverseCurve: Curves.easeInQuart,
                         );
                         return SlideTransition(
                           position: Tween<Offset>(
-                            begin: const Offset(0, 0.06),
+                            begin: const Offset(1.0, 0.0),
                             end: Offset.zero,
                           ).animate(curved),
                           child: FadeTransition(opacity: curved, child: child),

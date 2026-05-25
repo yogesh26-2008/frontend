@@ -18,6 +18,7 @@ import '../services/fcm_service.dart';
 import '../l10n/app_localizations.dart';
 import '../utils/error_dialog.dart';
 import 'glass_common.dart';
+import 'home/home_screen.dart';
 
 // ── Quick emoji choices ───────────────────────────────────────
 const _kQuickEmojis = ['❤️', '😂', '😮', '😢', '🔥', '👏', '🎉', '💯', '👍', '🥺'];
@@ -634,10 +635,29 @@ class _ChatScreenState extends State<ChatScreen>
                       controller: _scrollController,
                       reverse: true,
                       padding: const EdgeInsets.fromLTRB(12, 8, 12, 8),
-                      itemCount: _messages.length + (_typingUserId != null ? 1 : 0) + 1,
+                      itemCount: _messages.length + (_typingUserId != null ? 1 : 0) + 2,
                       itemBuilder: (context, index) {
-                        // 🔒 E2E banner at TOP (last index = top of reversed list)
+                        // ← Back arrow at very top
                         final bannerIndex = _messages.length + (_typingUserId != null ? 1 : 0);
+                        final backIndex  = bannerIndex + 1;
+                        if (index == backIndex) {
+                          return Padding(
+                            padding: const EdgeInsets.only(bottom: 6),
+                            child: GestureDetector(
+                              onTap: () => Navigator.of(context).pushAndRemoveUntil(
+                                MaterialPageRoute(builder: (_) => const HomeScreen()),
+                                (route) => false,
+                              ),
+                              child: Row(children: [
+                                Icon(Icons.arrow_back_ios_new_rounded, color: fg, size: 18),
+                                const SizedBox(width: 6),
+                                Text('Back',
+                                    style: manrope(size: 13, weight: FontWeight.w600, color: fg)),
+                              ]),
+                            ),
+                          );
+                        }
+                        // 🔒 E2E banner
                         if (index == bannerIndex) {
                           return _E2EBanner(dark: widget.dark);
                         }
@@ -693,11 +713,6 @@ class _ChatScreenState extends State<ChatScreen>
             height: headerH,
             padding: const EdgeInsets.symmetric(horizontal: 6),
             child: Row(children: [
-              IconButton(
-                icon: Icon(Icons.arrow_back_ios_new_rounded, color: fg, size: 20),
-                onPressed: () => Navigator.of(context).pop(),
-                splashRadius: 20,
-              ),
               Container(
                 width: 38, height: 38,
                 decoration: BoxDecoration(shape: BoxShape.circle, gradient: monoAvatar(widget.dark, 0)),

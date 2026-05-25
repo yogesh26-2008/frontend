@@ -113,6 +113,29 @@ class UserService {
     }
   }
 
+  static Future<UserProfile?> getUserProfile(String userId) async {
+    try {
+      final token = await ApiService.getToken();
+      if (token == null) return null;
+      final res = await http.get(
+        Uri.parse('$baseUrl/users/$userId'),
+        headers: {
+          'Content-Type': 'application/json',
+          'Authorization': 'Bearer $token',
+        },
+      ).timeout(const Duration(seconds: 10));
+      developer.log('getUserProfile $userId → ${res.statusCode}');
+      if (res.statusCode == 200) {
+        final decoded = jsonDecode(res.body) as Map<String, dynamic>;
+        return UserProfile.fromJson(decoded);
+      }
+      return null;
+    } catch (e) {
+      developer.log('getUserProfile error: $e');
+      return null;
+    }
+  }
+
   static Future<List<UserProfile>> getFollowers(String userId) async {
     try {
       final token = await ApiService.getToken();
@@ -133,6 +156,58 @@ class UserService {
     } catch (e) {
       developer.log('getFollowers error: $e');
       return [];
+    }
+  }
+
+  // ── Location ─────────────────────────────────────────────────────────────
+
+  static Future<bool> updateLocation(double lat, double lng, String city) async {
+    try {
+      final token = await ApiService.getToken();
+      if (token == null) return false;
+      final res = await http.put(
+        Uri.parse('$baseUrl/users/me/location'),
+        headers: {'Authorization': 'Bearer $token', 'Content-Type': 'application/json'},
+        body: jsonEncode({'latitude': lat, 'longitude': lng, 'city': city}),
+      ).timeout(const Duration(seconds: 10));
+      developer.log('updateLocation → ${res.statusCode}');
+      return res.statusCode == 200;
+    } catch (e) {
+      developer.log('updateLocation error: $e');
+      return false;
+    }
+  }
+
+  static Future<bool> updateLocationPrivacy(bool isPublic) async {
+    try {
+      final token = await ApiService.getToken();
+      if (token == null) return false;
+      final res = await http.put(
+        Uri.parse('$baseUrl/users/me/location-privacy'),
+        headers: {'Authorization': 'Bearer $token', 'Content-Type': 'application/json'},
+        body: jsonEncode({'is_public': isPublic}),
+      ).timeout(const Duration(seconds: 10));
+      developer.log('updateLocationPrivacy → ${res.statusCode}');
+      return res.statusCode == 200;
+    } catch (e) {
+      developer.log('updateLocationPrivacy error: $e');
+      return false;
+    }
+  }
+
+  static Future<bool> removeLocation() async {
+    try {
+      final token = await ApiService.getToken();
+      if (token == null) return false;
+      final res = await http.delete(
+        Uri.parse('$baseUrl/users/me/location'),
+        headers: {'Authorization': 'Bearer $token'},
+      ).timeout(const Duration(seconds: 10));
+      developer.log('removeLocation → ${res.statusCode}');
+      return res.statusCode == 200;
+    } catch (e) {
+      developer.log('removeLocation error: $e');
+      return false;
     }
   }
 

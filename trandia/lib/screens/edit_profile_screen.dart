@@ -134,7 +134,19 @@ class _EditProfileScreenState extends State<EditProfileScreen> {
       }
     } catch (e) {
       if (mounted) {
-        showErrorDialog(context, message: 'Failed to update profile');
+        final msg = e.toString().replaceFirst('ApiException: ', '');
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text(
+              msg.isNotEmpty ? msg : 'Failed to update profile',
+              style: manrope(size: 14, weight: FontWeight.w600, color: Colors.white),
+            ),
+            backgroundColor: Colors.redAccent.withOpacity(0.85),
+            behavior: SnackBarBehavior.floating,
+            shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(14)),
+            margin: const EdgeInsets.fromLTRB(16, 0, 16, 20),
+          ),
+        );
       }
     } finally {
       if (mounted) setState(() => _isSaving = false);

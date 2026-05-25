@@ -18,6 +18,7 @@ import '../home/home_screen.dart';
 import '../../services/auth_service.dart';
 import '../../services/api_service.dart';
 import '../../l10n/app_localizations.dart';
+import '../../utils/error_dialog.dart';
 
 // ── Username check status ─────────────────────────────────────────────────────
 enum _UStatus { idle, typing, loading, available, taken, error }
@@ -188,9 +189,7 @@ class _SignUpScreenState extends State<SignUpScreen> {
 
   void _showError(String message) {
     if (!mounted) return;
-    ScaffoldMessenger.of(context).showSnackBar(
-      SnackBar(content: Text(message), backgroundColor: Colors.redAccent),
-    );
+    showErrorDialog(context, message: message);
   }
 
   Future<DateTime?> _showDobPicker(BuildContext context, _GlassTheme t) async {

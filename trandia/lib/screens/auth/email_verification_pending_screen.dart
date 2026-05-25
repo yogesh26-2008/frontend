@@ -5,6 +5,7 @@ import '../home/home_screen.dart';
 import '../../services/auth_service.dart';
 import '../../l10n/app_localizations.dart';
 import '../../services/api_service.dart';
+import '../../utils/error_dialog.dart';
 
 class EmailVerificationPendingScreen extends StatefulWidget {
   final String email;
@@ -73,12 +74,16 @@ class _EmailVerificationPendingScreenState
 
   void _showMsg(String msg, {bool isError = true}) {
     if (!mounted) return;
-    ScaffoldMessenger.of(context).showSnackBar(
-      SnackBar(
-        content: Text(msg),
-        backgroundColor: isError ? Colors.redAccent : Colors.green,
-      ),
-    );
+    if (isError) {
+      showErrorDialog(context, message: msg);
+    } else {
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: Text(msg),
+          backgroundColor: Colors.green,
+        ),
+      );
+    }
   }
 
   Future<void> _doCompleteSignup() async {

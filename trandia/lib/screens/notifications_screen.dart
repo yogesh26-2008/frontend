@@ -16,6 +16,8 @@ import '../services/chat_service.dart';
 import '../l10n/app_localizations.dart';
 import '../utils/error_dialog.dart';
 import 'glass_common.dart';
+import 'home/home_screen.dart';
+import 'notification_settings_screen.dart';
 
 enum NfKind { like, comment, follow, mention, live, msg, system }
 
@@ -251,6 +253,26 @@ class _NotificationsScreenState extends State<NotificationsScreen> {
     }
   }
 
+  void _openHome() {
+    if (widget.onClose != null) {
+      widget.onClose!();
+      return;
+    }
+
+    Navigator.of(context).pushAndRemoveUntil(
+      MaterialPageRoute(builder: (_) => const HomeScreen()),
+      (route) => false,
+    );
+  }
+
+  void _openSettings() {
+    Navigator.of(context).push(
+      MaterialPageRoute(
+        builder: (_) => NotificationSettingsScreen(dark: widget.dark),
+      ),
+    );
+  }
+
   @override
   Widget build(BuildContext context) {
     final dark = widget.dark;
@@ -287,7 +309,7 @@ class _NotificationsScreenState extends State<NotificationsScreen> {
             padding: const EdgeInsets.only(left: 4, right: 8),
             child: Row(children: [
               GestureDetector(
-                onTap: () => Navigator.of(context).pop(),
+                onTap: _openHome,
                 child: GlassCircleButton(dark: dark, icon: Icons.arrow_back_ios_new_rounded, iconSize: 18),
               ),
               const SizedBox(width: 4),
@@ -305,7 +327,12 @@ class _NotificationsScreenState extends State<NotificationsScreen> {
                   child: GlassCircleButton(dark: dark, icon: Icons.done_all, iconSize: 18),
                 )
               else
-                GlassCircleButton(dark: dark, icon: Icons.settings_outlined, iconSize: 18),
+                GlassCircleButton(
+                  dark: dark,
+                  icon: Icons.settings_outlined,
+                  iconSize: 18,
+                  onTap: _openSettings,
+                ),
             ]),
           ),
         ),

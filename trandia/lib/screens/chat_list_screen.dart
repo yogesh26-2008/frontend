@@ -18,6 +18,7 @@ import '../models/chat_model.dart';
 import 'glass_common.dart';
 import 'chat_screen.dart';
 import 'search_screen.dart';
+import 'home/home_screen.dart';
 
 class ActiveUser {
   final String name;
@@ -157,6 +158,19 @@ class _ChatListScreenState extends State<ChatListScreen> with WidgetsBindingObse
                 dark: widget.dark,
                 padding: const EdgeInsets.symmetric(horizontal: 6),
                 child: Row(children: [
+                  GlassCircleButton(
+                    dark: widget.dark,
+                    icon: Icons.arrow_back_ios_new,
+                    iconSize: 15,
+                    onTap: () {
+                      HapticFeedback.selectionClick();
+                      Navigator.of(context).pushAndRemoveUntil(
+                        MaterialPageRoute(builder: (_) => const HomeScreen()),
+                        (route) => false,
+                      );
+                    },
+                  ),
+                  const SizedBox(width: 8),
                   Text('Messages'.tr(context),
                       style: manrope(
                           size: 17,
@@ -176,6 +190,12 @@ class _ChatListScreenState extends State<ChatListScreen> with WidgetsBindingObse
                   const SizedBox(width: 6),
                   GlassCircleButton(
                       dark: widget.dark, icon: Icons.edit_outlined, iconSize: 18),
+                  const SizedBox(width: 6),
+                  GlassCircleButton(
+                    dark: widget.dark,
+                    icon: Icons.notifications_outlined,
+                    iconSize: 18,
+                  ),
                 ]),
               ),
             ),
@@ -271,7 +291,7 @@ class _ChatListScreenState extends State<ChatListScreen> with WidgetsBindingObse
                           onRefresh: _loadConversations,
                           child: ListView.builder(
                             padding: const EdgeInsets.fromLTRB(0, 0, 0, 16),
-                            // +1 for the header, +1 if empty state
+                            // +1 for header, +1 if empty state
                             itemCount: 1 + (_conversations.isEmpty ? 1 : _conversations.length),
                             itemBuilder: (context, index) {
                               // Header row

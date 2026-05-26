@@ -101,6 +101,10 @@ class _ShotsScreenState extends State<ShotsScreen>
   final Map<int, bool> _saved   = {};
   bool _expanded = false;
 
+  // ── Learn-feed nudge counter ──────────────────────────────────
+  int  _funReelCount  = 0;   // reels watched in fun feed this session
+  bool _nudgePending  = false; // debounce: don't stack multiple dialogs
+
   // ── Spinning audio disc (purely decorative) ───────────────────
   late final AnimationController _spin = AnimationController(
     vsync: this, duration: const Duration(seconds: 6))..repeat();
@@ -234,13 +238,29 @@ class _ShotsScreenState extends State<ShotsScreen>
 
     // Fetch more when 3 posts from the end
     if (idx >= _posts.length - 3) _loadFeed();
+
+    // Track fun-feed watch count and nudge every 10 reels
+    if (_feed == ShotsFeed.fun) {
+      _funReelCount++;
+      if (_funReelCount % 10 == 0 && !_nudgePending) {
+        _nudgePending = true;
+        WidgetsBinding.instance.addPostFrameCallback((_) {
+          if (mounted) _showLearnNudge();
+        });
+      }
+    }
   }
 
   void _setFeed(ShotsFeed f) {
     if (f == _feed) return;
     HapticFeedback.selectionClick();
     _ctrls[_curIdx]?.pause();
-    setState(() { _feed = f; _expanded = false; });
+    setState(() {
+      _feed         = f;
+      _expanded     = false;
+      _funReelCount = 0;   // reset counter on every feed switch
+      _nudgePending = false;
+    });
     _loadFeed(refresh: true);
   }
 
@@ -249,6 +269,38 @@ class _ShotsScreenState extends State<ShotsScreen>
     for (final c in _ctrls.values) {
       c.setVolume(_muted ? 0.0 : 1.0);
     }
+  }
+
+  Future<void> _showLearnNudge() async {
+    // Pause current video while dialog is up
+    _ctrls[_curIdx]?.pause();
+
+    await showGeneralDialog<bool>(
+      context:          context,
+      barrierDismissible: false,
+      barrierColor:     Colors.black.withOpacity(0.55),
+      transitionDuration: const Duration(milliseconds: 340),
+      transitionBuilder: (_, anim, __, child) {
+        final curved = CurvedAnimation(parent: anim, curve: Curves.easeOutBack);
+        return ScaleTransition(scale: curved,
+          child: FadeTransition(opacity: anim, child: child));
+      },
+      pageBuilder: (ctx, _, __) => _LearnFeedNudge(
+        onSwitch: () {
+          Navigator.of(ctx).pop(true);
+          _setFeed(ShotsFeed.learn);
+        },
+        onSkip: () {
+          Navigator.of(ctx).pop(false);
+          // Resume video and reset nudge flag so it fires again after next 10
+          _ctrls[_curIdx]?.play();
+          setState(() => _nudgePending = false);
+        },
+      ),
+    );
+
+    // Safety: ensure flag is cleared if dialog dismissed any other way
+    if (mounted) setState(() => _nudgePending = false);
   }
 
   // ─────────────────────────────────────────────────────────────
@@ -438,6 +490,158 @@ class _ShotsScreenState extends State<ShotsScreen>
         )),
     ),
   );
+}
+
+// ───────────────────────────────────────────────────────────────
+// Learn-feed nudge dialog — shown every 10 fun reels
+// ───────────────────────────────────────────────────────────────
+
+class _LearnFeedNudge extends StatelessWidget {
+  final VoidCallback onSwitch;
+  final VoidCallback onSkip;
+  const _LearnFeedNudge({required this.onSwitch, required this.onSkip});
+
+  @override
+  Widget build(BuildContext context) {
+    return Center(
+      child: Padding(
+        padding: const EdgeInsets.symmetric(horizontal: 28),
+        child: ClipRRect(
+          borderRadius: BorderRadius.circular(28),
+          child: BackdropFilter(
+            filter: ImageFilter.blur(sigmaX: 32, sigmaY: 32),
+            child: Container(
+              padding: const EdgeInsets.fromLTRB(24, 32, 24, 28),
+              decoration: BoxDecoration(
+                color:        Colors.white.withOpacity(0.13),
+                borderRadius: BorderRadius.circular(28),
+                border:       Border.all(
+                    color: Colors.white.withOpacity(0.22), width: 1.2),
+                boxShadow: [
+                  BoxShadow(
+                    color:      Colors.black.withOpacity(0.35),
+                    blurRadius: 40, spreadRadius: -4,
+                    offset:     const Offset(0, 12),
+                  ),
+                ],
+              ),
+              child: Column(
+                mainAxisSize: MainAxisSize.min,
+                children: [
+                  // ── Icon badge ─────────────────────────────────
+                  Container(
+                    width: 72, height: 72,
+                    decoration: BoxDecoration(
+                      shape:    BoxShape.circle,
+                      gradient: const LinearGradient(
+                        begin:  Alignment.topLeft,
+                        end:    Alignment.bottomRight,
+                        colors: [Color(0xFF6C63FF), Color(0xFF3ECFCF)],
+                      ),
+                      boxShadow: [
+                        BoxShadow(
+                          color:      const Color(0xFF6C63FF).withOpacity(0.45),
+                          blurRadius: 22, offset: const Offset(0, 8)),
+                      ],
+                    ),
+                    child: const Center(
+                      child: Text('🎓', style: TextStyle(fontSize: 34)),
+                    ),
+                  ),
+                  const SizedBox(height: 22),
+
+                  // ── Headline ───────────────────────────────────
+                  Text(
+                    'You\'ve Watched 10 Fun Shots!',
+                    textAlign: TextAlign.center,
+                    style: manrope(
+                      size:          20,
+                      weight:        FontWeight.w800,
+                      color:         Colors.white,
+                      letterSpacing: -0.4,
+                    ),
+                  ),
+                  const SizedBox(height: 10),
+
+                  // ── Sub-text ───────────────────────────────────
+                  Text(
+                    'Switch to the Learn feed and discover something new?',
+                    textAlign: TextAlign.center,
+                    style: manrope(
+                      size:          14,
+                      weight:        FontWeight.w500,
+                      color:         Colors.white.withOpacity(0.72),
+                      letterSpacing: -0.1,
+                      height:        1.5,
+                    ),
+                  ),
+                  const SizedBox(height: 28),
+
+                  // ── Primary button: Switch ─────────────────────
+                  GestureDetector(
+                    onTap: onSwitch,
+                    child: Container(
+                      width:   double.infinity,
+                      height:  52,
+                      decoration: BoxDecoration(
+                        gradient: const LinearGradient(
+                          colors: [Color(0xFF6C63FF), Color(0xFF3ECFCF)],
+                          begin:  Alignment.centerLeft,
+                          end:    Alignment.centerRight,
+                        ),
+                        borderRadius: BorderRadius.circular(999),
+                        boxShadow: [
+                          BoxShadow(
+                            color:      const Color(0xFF6C63FF).withOpacity(0.4),
+                            blurRadius: 16, offset: const Offset(0, 6)),
+                        ],
+                      ),
+                      alignment: Alignment.center,
+                      child: Text(
+                        'Switch to Learn Feed',
+                        style: manrope(
+                          size:          15,
+                          weight:        FontWeight.w800,
+                          color:         Colors.white,
+                          letterSpacing: -0.15,
+                        ),
+                      ),
+                    ),
+                  ),
+                  const SizedBox(height: 12),
+
+                  // ── Secondary button: Skip ─────────────────────
+                  GestureDetector(
+                    onTap: onSkip,
+                    child: Container(
+                      width:   double.infinity,
+                      height:  48,
+                      decoration: BoxDecoration(
+                        color:        Colors.white.withOpacity(0.10),
+                        borderRadius: BorderRadius.circular(999),
+                        border:       Border.all(
+                            color: Colors.white.withOpacity(0.20), width: 1),
+                      ),
+                      alignment: Alignment.center,
+                      child: Text(
+                        'Keep Watching Fun',
+                        style: manrope(
+                          size:          14,
+                          weight:        FontWeight.w600,
+                          color:         Colors.white.withOpacity(0.85),
+                          letterSpacing: -0.1,
+                        ),
+                      ),
+                    ),
+                  ),
+                ],
+              ),
+            ),
+          ),
+        ),
+      ),
+    );
+  }
 }
 
 // ───────────────────────────────────────────────────────────────

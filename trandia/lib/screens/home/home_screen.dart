@@ -370,7 +370,7 @@ class _HomeScreenState extends State<HomeScreen>
           );
           return SlideTransition(
             position: Tween<Offset>(
-              begin: const Offset(1.0, 0.0), // native feel slide from right side
+              begin: const Offset(-1.0, 0.0), // slide in from left on left-swipe
               end: Offset.zero,
             ).animate(curved),
             child: FadeTransition(opacity: curved, child: child),
@@ -428,7 +428,7 @@ class _HomeScreenState extends State<HomeScreen>
           if (_swipeStartX == null) return;
           final dx = e.position.dx - _swipeStartX!;
           final dy = (e.position.dy - (_swipeStartY ?? 0)).abs();
-          if (dx > 60 && dy < dx * 0.65) _openChatScreen();
+          if (dx < -60 && dy < (-dx) * 0.65) _openChatScreen();
           _swipeStartX = null;
           _swipeStartY = null;
         },
@@ -1060,10 +1060,11 @@ class _VideoCard extends StatefulWidget {
 class _VideoCardState extends State<_VideoCard> {
   VideoPlayerController? _ctrl;
   bool _initialized    = false;
-  bool _muted          = false;   // volume HIGH by default (unmuted)
-  bool _manualPause    = false;   // user double-tapped to pause
-  bool _dataSaver      = false;   // on mobile data → no autoplay
-  bool _showOverlay    = false;   // brief play/pause icon flash
+  bool _muted          = false;
+  bool _manualPause    = false;   // long-press to pause; clears only on explicit tap-play
+  bool _dataSaver      = false;
+  bool _showOverlay    = false;
+  IconData _overlayIcon = Icons.pause_rounded;
 
   @override
   void initState() {
@@ -1113,31 +1114,40 @@ class _VideoCardState extends State<_VideoCard> {
     } else {
       if (_initialized) {
         _ctrl?.pause();
-        // Clear manual-pause state so next scroll-in auto-plays
-        if (_manualPause) _manualPause = false;
+        // _manualPause intentionally NOT reset here — long-press pause persists across tab/scroll
       }
     }
   }
 
-  void _onDoubleTap() {
-    HapticFeedback.lightImpact();
+  // Tap = play (if paused or data-saver)
+  void _onTap() {
     if (!_initialized) {
       _dataSaver = false;
       _initAndPlay();
       return;
     }
-    final playing = _ctrl?.value.isPlaying ?? false;
-    if (playing) {
+    if (_manualPause || !(_ctrl?.value.isPlaying ?? false)) {
+      _manualPause = false;
+      _ctrl?.play();
+      setState(() { _showOverlay = true; _overlayIcon = Icons.play_arrow_rounded; });
+      Future.delayed(const Duration(milliseconds: 700), () {
+        if (mounted) setState(() => _showOverlay = false);
+      });
+    }
+  }
+
+  // Long press = pause only
+  void _onLongPress() {
+    HapticFeedback.mediumImpact();
+    if (!_initialized) return;
+    if (_ctrl?.value.isPlaying ?? false) {
       _ctrl?.pause();
       _manualPause = true;
-    } else {
-      _ctrl?.play();
-      _manualPause = false;
+      setState(() { _showOverlay = true; _overlayIcon = Icons.pause_rounded; });
+      Future.delayed(const Duration(milliseconds: 700), () {
+        if (mounted) setState(() => _showOverlay = false);
+      });
     }
-    setState(() => _showOverlay = true);
-    Future.delayed(const Duration(milliseconds: 700), () {
-      if (mounted) setState(() => _showOverlay = false);
-    });
   }
 
   void _onTapManualPlay() {
@@ -1164,8 +1174,7 @@ class _VideoCardState extends State<_VideoCard> {
 
   @override
   Widget build(BuildContext context) {
-    final thumbnailUrl = widget.post.thumbnailUrl ?? widget.post.mediaUrl;
-    final isPlaying    = _ctrl?.value.isPlaying ?? false;
+    final String? thumbnailUrl = widget.post.thumbnailUrl;
 
     return VisibilityDetector(
       key: Key('vid_${widget.post.id}'),
@@ -1173,19 +1182,24 @@ class _VideoCardState extends State<_VideoCard> {
       child: AspectRatio(
         aspectRatio: widget.post.aspectRatio,
         child: GestureDetector(
-          onDoubleTap: _onDoubleTap,
+          onTap: _onTap,
+          onLongPress: _onLongPress,
           child: Stack(fit: StackFit.expand, children: [
 
-            // ── Thumbnail (always shown until video ready) ──
-            CachedNetworkImage(
-              imageUrl: thumbnailUrl,
-              fit: BoxFit.cover,
-              placeholder: (_, __) => Container(color: Colors.black12),
-              errorWidget: (_, __, ___) => Container(
-                color: Colors.black12,
-                child: const Icon(Icons.broken_image_outlined,
-                    color: Colors.white30)),
-            ),
+            // ── Thumbnail (static preview while scrolling) ──
+            if (thumbnailUrl != null && thumbnailUrl.isNotEmpty)
+              CachedNetworkImage(
+                imageUrl: thumbnailUrl,
+                fit: BoxFit.cover,
+                placeholder: (_, __) => const ColoredBox(color: Color(0xFF111111)),
+                errorWidget: (_, __, ___) => const ColoredBox(color: Color(0xFF111111)),
+              )
+            else
+              Container(
+                color: const Color(0xFF111111),
+                child: const Center(child: Icon(Icons.play_circle_outline_rounded,
+                    color: Colors.white24, size: 44)),
+              ),
 
             // ── Video frame (on top once initialized) ──────
             if (_initialized && _ctrl != null)
@@ -1222,7 +1236,7 @@ class _VideoCardState extends State<_VideoCard> {
                 child: CircularProgressIndicator(
                     color: Colors.white54, strokeWidth: 2))),
 
-            // ── Double-tap play/pause flash overlay ────────
+            // ── Long-press / tap flash overlay ─────────────
             if (_showOverlay)
               Center(child: AnimatedOpacity(
                 opacity: _showOverlay ? 1.0 : 0.0,
@@ -1232,9 +1246,7 @@ class _VideoCardState extends State<_VideoCard> {
                   decoration: BoxDecoration(
                     shape: BoxShape.circle,
                     color: Colors.black.withOpacity(0.55)),
-                  child: Icon(
-                    isPlaying ? Icons.pause_rounded : Icons.play_arrow_rounded,
-                    color: Colors.white, size: 34),
+                  child: Icon(_overlayIcon, color: Colors.white, size: 34),
                 ),
               )),
 

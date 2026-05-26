@@ -165,7 +165,7 @@ class _ChatListScreenState extends State<ChatListScreen> with WidgetsBindingObse
           if (_swipeStartX == null) return;
           final dx = e.position.dx - _swipeStartX!;
           final dy = (e.position.dy - (_swipeStartY ?? 0)).abs();
-          if (dx < -60 && dy < (-dx) * 0.65) {
+          if (dx > 60 && dy < dx * 0.65) {
             HapticFeedback.selectionClick();
             if (Navigator.of(context).canPop()) Navigator.of(context).pop();
           }

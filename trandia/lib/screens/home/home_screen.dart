@@ -379,6 +379,30 @@ class _HomeScreenState extends State<HomeScreen>
     _loadUnreadCount();
   }
 
+  void _openStarScreen(bool isDark) {
+    HapticFeedback.selectionClick();
+    if (_navOpen) {
+      setState(() => _navOpen = false);
+      _navCtrl.reverse();
+    }
+    Navigator.of(context).push(
+      PageRouteBuilder(
+        pageBuilder: (context, animation, secondaryAnimation) =>
+            _StarEmptyScreen(isDark: isDark),
+        transitionDuration: const Duration(milliseconds: 260),
+        reverseTransitionDuration: const Duration(milliseconds: 220),
+        transitionsBuilder: (context, animation, secondaryAnimation, child) {
+          final curved = CurvedAnimation(
+            parent: animation,
+            curve: Curves.easeOutQuart,
+            reverseCurve: Curves.easeInQuart,
+          );
+          return FadeTransition(opacity: curved, child: child);
+        },
+      ),
+    );
+  }
+
   void _openIsland() {
     _captureIslandRect();
     HapticFeedback.mediumImpact();
@@ -522,6 +546,19 @@ class _HomeScreenState extends State<HomeScreen>
         ),
 
         SafeArea(child: Stack(children: [
+
+          Align(alignment: Alignment.topLeft,
+            child: Padding(padding: const EdgeInsets.only(top: 10, left: 14),
+              child: GestureDetector(
+                onTap: () => _openStarScreen(isDark),
+                child: SizedBox(width: 30, height: 30,
+                  child: Icon(
+                    Icons.star_border_rounded,
+                    size: 25,
+                    color: isDark ? Colors.white : const Color(0xFF1A1A1A),
+                  ),
+                ),
+              ))),
 
           // ── Island pill — now with unread notification badge ──
           Align(alignment: Alignment.topCenter,
@@ -678,6 +715,19 @@ class _HomeScreenState extends State<HomeScreen>
 // ═════════════════════════════════════════════════════
 //  STORY SECTION
 // ═════════════════════════════════════════════════════
+class _StarEmptyScreen extends StatelessWidget {
+  final bool isDark;
+  const _StarEmptyScreen({required this.isDark});
+
+  @override
+  Widget build(BuildContext context) {
+    return Scaffold(
+      backgroundColor: isDark ? const Color(0xFF050506) : const Color(0xFFF8F8FA),
+      body: const SizedBox.expand(),
+    );
+  }
+}
+
 class _StorySection extends StatelessWidget {
   final bool isDark;
   const _StorySection({required this.isDark});

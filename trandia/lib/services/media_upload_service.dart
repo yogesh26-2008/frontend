@@ -110,8 +110,11 @@ class MediaUploadService {
       _upload(file, folder: folder, resourceType: 'video', onProgress: onProgress);
 
   /// Upload profile picture — convenience wrapper.
-  Future<MediaUploadResult> uploadProfilePicture(File file) =>
-      uploadImage(file, folder: MediaFolder.profiles);
+  Future<MediaUploadResult> uploadProfilePicture(
+    File file, {
+    void Function(double progress)? onProgress,
+  }) =>
+      uploadImage(file, folder: MediaFolder.profiles, onProgress: onProgress);
 
   /// Delete media from CDN. publicId comes from MediaUploadResult.publicId.
   Future<bool> deleteMedia(String publicId, {String resourceType = 'image'}) async {

@@ -1,13 +1,15 @@
+import 'dart:io';
 import 'dart:ui';
 import 'package:flutter/material.dart';
 import 'package:font_awesome_flutter/font_awesome_flutter.dart';
+import 'package:image_picker/image_picker.dart';
 import 'package:url_launcher/url_launcher.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 import 'glass_common.dart';
 import '../models/chat_model.dart';
 import '../services/user_service.dart';
 import '../services/api_service.dart';
-import '../utils/error_dialog.dart';
+import '../services/media_upload_service.dart';
 
 class EditProfileScreen extends StatefulWidget {
   final bool dark;
@@ -33,6 +35,12 @@ class _EditProfileScreenState extends State<EditProfileScreen> {
   bool _isSaving = false;
   UserProfile? _profile;
   List<String> _platformOrder = ['snapchat', 'instagram', 'whatsapp', 'facebook', 'twitter', 'youtube'];
+
+  // Profile photo state
+  File? _pendingPhotoFile;       // locally picked, not yet saved
+  String? _pendingPhotoUrl;      // cloudinary URL after upload
+  bool _isUploadingPhoto = false;
+  double _uploadProgress = 0.0;
 
   @override
   void initState() {
@@ -94,6 +102,147 @@ class _EditProfileScreenState extends State<EditProfileScreen> {
     }
   }
 
+  // ── Pick photo from gallery or camera ──────────────────────────────────────
+  Future<void> _pickPhoto(ImageSource source) async {
+    final picker = ImagePicker();
+    final picked = await picker.pickImage(
+      source: source,
+      imageQuality: 85,
+      maxWidth: 1024,
+      maxHeight: 1024,
+    );
+    if (picked == null || !mounted) return;
+
+    final file = File(picked.path);
+    setState(() {
+      _pendingPhotoFile = file;
+      _pendingPhotoUrl = null;
+      _isUploadingPhoto = true;
+      _uploadProgress = 0.0;
+    });
+
+    try {
+      final result = await MediaUploadService.instance.uploadProfilePicture(
+        file,
+        onProgress: (p) {
+          if (mounted) setState(() => _uploadProgress = p);
+        },
+      );
+      if (mounted) {
+        setState(() {
+          _pendingPhotoUrl = result.url;
+          _isUploadingPhoto = false;
+        });
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text(
+              'Photo uploaded! Tap Save to apply.',
+              style: manrope(size: 14, weight: FontWeight.w600, color: Colors.white),
+            ),
+            backgroundColor: widget.dark ? const Color(0xFF1C1C1F) : const Color(0xFF333333),
+            behavior: SnackBarBehavior.floating,
+            shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(14)),
+            margin: const EdgeInsets.fromLTRB(16, 0, 16, 20),
+          ),
+        );
+      }
+    } catch (e) {
+      if (mounted) {
+        setState(() {
+          _pendingPhotoFile = null;
+          _pendingPhotoUrl = null;
+          _isUploadingPhoto = false;
+        });
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text(
+              'Photo upload failed. Please try again.',
+              style: manrope(size: 14, weight: FontWeight.w600, color: Colors.white),
+            ),
+            backgroundColor: Colors.redAccent.withOpacity(0.85),
+            behavior: SnackBarBehavior.floating,
+            shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(14)),
+            margin: const EdgeInsets.fromLTRB(16, 0, 16, 20),
+          ),
+        );
+      }
+    }
+  }
+
+  // ── Show bottom sheet to choose source ─────────────────────────────────────
+  void _showPhotoOptions() {
+    final dark = widget.dark;
+    showModalBottomSheet(
+      context: context,
+      backgroundColor: dark ? const Color(0xFF1C1C1F) : Colors.white,
+      shape: const RoundedRectangleBorder(
+        borderRadius: BorderRadius.vertical(top: Radius.circular(24)),
+      ),
+      builder: (ctx) => SafeArea(
+        child: Padding(
+          padding: const EdgeInsets.fromLTRB(20, 16, 20, 12),
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              Container(
+                width: 40,
+                height: 4,
+                margin: const EdgeInsets.only(bottom: 20),
+                decoration: BoxDecoration(
+                  color: dark ? Colors.white24 : Colors.black12,
+                  borderRadius: BorderRadius.circular(2),
+                ),
+              ),
+              Text(
+                'Change Profile Photo',
+                style: manrope(size: 16, weight: FontWeight.w800,
+                    color: GlassTokens.fg(dark)),
+              ),
+              const SizedBox(height: 20),
+              _PhotoOptionTile(
+                dark: dark,
+                icon: Icons.photo_library_rounded,
+                label: 'Choose from Gallery',
+                onTap: () {
+                  Navigator.pop(ctx);
+                  _pickPhoto(ImageSource.gallery);
+                },
+              ),
+              const SizedBox(height: 10),
+              _PhotoOptionTile(
+                dark: dark,
+                icon: Icons.camera_alt_rounded,
+                label: 'Take a Photo',
+                onTap: () {
+                  Navigator.pop(ctx);
+                  _pickPhoto(ImageSource.camera);
+                },
+              ),
+              if (_pendingPhotoFile != null || _profile?.picture != null) ...
+                [
+                  const SizedBox(height: 10),
+                  _PhotoOptionTile(
+                    dark: dark,
+                    icon: Icons.delete_outline_rounded,
+                    label: 'Remove Photo',
+                    isDestructive: true,
+                    onTap: () {
+                      Navigator.pop(ctx);
+                      setState(() {
+                        _pendingPhotoFile = null;
+                        _pendingPhotoUrl = 'REMOVE';
+                      });
+                    },
+                  ),
+                ],
+              const SizedBox(height: 8),
+            ],
+          ),
+        ),
+      ),
+    );
+  }
+
   Future<void> _saveProfile() async {
     if (_isSaving) return;
     setState(() => _isSaving = true);
@@ -101,22 +250,25 @@ class _EditProfileScreenState extends State<EditProfileScreen> {
       final prefs = await SharedPreferences.getInstance();
       await prefs.setStringList('social_platform_order', _platformOrder);
 
-      await ApiService.put(
-        '/users/me',
-        {
-          'name': _nameController.text.trim(),
-          'username': _usernameController.text.trim(),
-          'bio': _bioController.text.trim(),
-          'link': _linkController.text.trim(),
-          'snapchat_link': _snapchatController.text.trim(),
-          'instagram_link': _instagramController.text.trim(),
-          'whatsapp_link': _whatsappController.text.trim(),
-          'facebook_link': _facebookController.text.trim(),
-          'twitter_link': _twitterController.text.trim(),
-          'youtube_link': _youtubeController.text.trim(),
-        },
-        requiresAuth: true,
-      );
+      final body = <String, dynamic>{
+        'name': _nameController.text.trim(),
+        'username': _usernameController.text.trim(),
+        'bio': _bioController.text.trim(),
+        'link': _linkController.text.trim(),
+        'snapchat_link': _snapchatController.text.trim(),
+        'instagram_link': _instagramController.text.trim(),
+        'whatsapp_link': _whatsappController.text.trim(),
+        'facebook_link': _facebookController.text.trim(),
+        'twitter_link': _twitterController.text.trim(),
+        'youtube_link': _youtubeController.text.trim(),
+      };
+
+      // Include new photo URL if one was uploaded
+      if (_pendingPhotoUrl != null && _pendingPhotoUrl != 'REMOVE') {
+        body['picture'] = _pendingPhotoUrl;
+      }
+
+      await ApiService.put('/users/me', body, requiresAuth: true);
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
           SnackBar(
@@ -219,6 +371,13 @@ class _EditProfileScreenState extends State<EditProfileScreen> {
                               initial: _profile?.name.isNotEmpty == true
                                   ? _profile!.name[0].toUpperCase()
                                   : '?',
+                              pictureUrl: _pendingPhotoUrl == 'REMOVE'
+                                  ? null
+                                  : (_pendingPhotoUrl ?? _profile?.picture),
+                              pendingFile: _pendingPhotoFile,
+                              isUploading: _isUploadingPhoto,
+                              uploadProgress: _uploadProgress,
+                              onTap: _isUploadingPhoto ? null : _showPhotoOptions,
                             ),
                             const SizedBox(height: 24),
 
@@ -359,7 +518,7 @@ class _SaveButton extends StatelessWidget {
 }
 
 // ─────────────────────────────────────────────────────────────────
-// Avatar section with change-photo overlay
+// Avatar section with change-photo overlay (tappable)
 // ─────────────────────────────────────────────────────────────────
 
 class _AvatarSection extends StatelessWidget {
@@ -367,11 +526,22 @@ class _AvatarSection extends StatelessWidget {
   final Color fg;
   final Color sub;
   final String initial;
+  final String? pictureUrl;
+  final File? pendingFile;
+  final bool isUploading;
+  final double uploadProgress;
+  final VoidCallback? onTap;
+
   const _AvatarSection({
     required this.dark,
     required this.fg,
     required this.sub,
     required this.initial,
+    this.pictureUrl,
+    this.pendingFile,
+    this.isUploading = false,
+    this.uploadProgress = 0.0,
+    this.onTap,
   });
 
   @override
@@ -379,85 +549,96 @@ class _AvatarSection extends StatelessWidget {
     return Center(
       child: Column(
         children: [
-          Stack(
-            alignment: Alignment.bottomRight,
-            children: [
-              Container(
-                width: 100,
-                height: 100,
-                padding: const EdgeInsets.all(3),
-                decoration: BoxDecoration(
-                  shape: BoxShape.circle,
-                  color: dark ? const Color(0xFF0A0A0C) : const Color(0xFFFAFAFA),
-                  boxShadow: [
-                    BoxShadow(
-                      color: dark
-                          ? Colors.black.withOpacity(0.8)
-                          : const Color(0xFF14161E).withOpacity(0.25),
-                      blurRadius: 36,
-                      offset: const Offset(0, 18),
-                      spreadRadius: -16,
-                    ),
-                  ],
-                ),
-                child: Container(
+          GestureDetector(
+            onTap: onTap,
+            child: Stack(
+              alignment: Alignment.bottomRight,
+              children: [
+                // ── Avatar circle ──
+                Container(
+                  width: 100,
+                  height: 100,
+                  padding: const EdgeInsets.all(3),
                   decoration: BoxDecoration(
                     shape: BoxShape.circle,
-                    gradient: monoAvatar(dark, 0),
+                    color: dark ? const Color(0xFF0A0A0C) : const Color(0xFFFAFAFA),
                     boxShadow: [
                       BoxShadow(
-                        color: Colors.white.withOpacity(0.22),
-                        blurRadius: 0,
-                        offset: const Offset(0, 1),
-                        spreadRadius: -1,
+                        color: dark
+                            ? Colors.black.withOpacity(0.8)
+                            : const Color(0xFF14161E).withOpacity(0.25),
+                        blurRadius: 36,
+                        offset: const Offset(0, 18),
+                        spreadRadius: -16,
                       ),
                     ],
                   ),
-                  alignment: Alignment.center,
-                  child: Text(
-                    initial,
-                    style: manrope(
-                      size: 36,
-                      weight: FontWeight.w700,
-                      color: Colors.white,
-                      letterSpacing: -1.08,
-                    ),
+                  child: ClipOval(
+                    child: _buildAvatarContent(),
                   ),
                 ),
-              ),
-              // Camera badge
-              Container(
-                width: 32,
-                height: 32,
-                decoration: BoxDecoration(
-                  shape: BoxShape.circle,
-                  color: dark ? const Color(0xFF1C1C1F) : Colors.white,
-                  border: Border.all(
-                    color: dark
-                        ? Colors.white.withOpacity(0.12)
-                        : Colors.black.withOpacity(0.08),
-                    width: 1.5,
-                  ),
-                  boxShadow: [
-                    BoxShadow(
-                      color: Colors.black.withOpacity(dark ? 0.5 : 0.12),
-                      blurRadius: 10,
-                      offset: const Offset(0, 4),
-                      spreadRadius: -4,
+
+                // ── Upload progress ring ──
+                if (isUploading)
+                  SizedBox(
+                    width: 100,
+                    height: 100,
+                    child: CircularProgressIndicator(
+                      value: uploadProgress,
+                      strokeWidth: 3,
+                      backgroundColor: Colors.white24,
+                      valueColor: AlwaysStoppedAnimation<Color>(fg),
                     ),
-                  ],
+                  ),
+
+                // ── Camera badge ──
+                Container(
+                  width: 32,
+                  height: 32,
+                  decoration: BoxDecoration(
+                    shape: BoxShape.circle,
+                    color: dark ? const Color(0xFF1C1C1F) : Colors.white,
+                    border: Border.all(
+                      color: dark
+                          ? Colors.white.withOpacity(0.12)
+                          : Colors.black.withOpacity(0.08),
+                      width: 1.5,
+                    ),
+                    boxShadow: [
+                      BoxShadow(
+                        color: Colors.black.withOpacity(dark ? 0.5 : 0.12),
+                        blurRadius: 10,
+                        offset: const Offset(0, 4),
+                        spreadRadius: -4,
+                      ),
+                    ],
+                  ),
+                  child: isUploading
+                      ? SizedBox(
+                          width: 16,
+                          height: 16,
+                          child: Padding(
+                            padding: const EdgeInsets.all(8),
+                            child: CircularProgressIndicator(
+                              strokeWidth: 2,
+                              valueColor: AlwaysStoppedAnimation<Color>(fg),
+                            ),
+                          ),
+                        )
+                      : Icon(
+                          Icons.camera_alt_rounded,
+                          size: 16,
+                          color: fg,
+                        ),
                 ),
-                child: Icon(
-                  Icons.camera_alt_rounded,
-                  size: 16,
-                  color: fg,
-                ),
-              ),
-            ],
+              ],
+            ),
           ),
           const SizedBox(height: 12),
           Text(
-            'Change photo',
+            isUploading
+                ? 'Uploading... ${(uploadProgress * 100).toStringAsFixed(0)}%'
+                : 'Change photo',
             style: manrope(
               size: 13,
               weight: FontWeight.w700,
@@ -465,6 +646,105 @@ class _AvatarSection extends StatelessWidget {
             ),
           ),
         ],
+      ),
+    );
+  }
+
+  Widget _buildAvatarContent() {
+    // Priority: local pending file > remote URL > initials
+    if (pendingFile != null) {
+      return Image.file(
+        pendingFile!,
+        width: 94,
+        height: 94,
+        fit: BoxFit.cover,
+      );
+    }
+    if (pictureUrl != null && pictureUrl!.isNotEmpty) {
+      return Image.network(
+        pictureUrl!,
+        width: 94,
+        height: 94,
+        fit: BoxFit.cover,
+        errorBuilder: (_, __, ___) => _initialsCircle(),
+        loadingBuilder: (_, child, loadingProgress) {
+          if (loadingProgress == null) return child;
+          return _initialsCircle();
+        },
+      );
+    }
+    return _initialsCircle();
+  }
+
+  Widget _initialsCircle() {
+    return Container(
+      width: 94,
+      height: 94,
+      decoration: BoxDecoration(
+        gradient: monoAvatar(dark, 0),
+      ),
+      alignment: Alignment.center,
+      child: Text(
+        initial,
+        style: manrope(
+          size: 36,
+          weight: FontWeight.w700,
+          color: Colors.white,
+          letterSpacing: -1.08,
+        ),
+      ),
+    );
+  }
+}
+
+// ─────────────────────────────────────────────────────────────────
+// Photo option tile for bottom sheet
+// ─────────────────────────────────────────────────────────────────
+
+class _PhotoOptionTile extends StatelessWidget {
+  final bool dark;
+  final IconData icon;
+  final String label;
+  final VoidCallback onTap;
+  final bool isDestructive;
+
+  const _PhotoOptionTile({
+    required this.dark,
+    required this.icon,
+    required this.label,
+    required this.onTap,
+    this.isDestructive = false,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    final color = isDestructive
+        ? Colors.redAccent
+        : GlassTokens.fg(dark);
+    return GestureDetector(
+      onTap: onTap,
+      child: Container(
+        padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 14),
+        decoration: BoxDecoration(
+          borderRadius: BorderRadius.circular(16),
+          color: dark
+              ? Colors.white.withOpacity(0.07)
+              : Colors.black.withOpacity(0.05),
+        ),
+        child: Row(
+          children: [
+            Icon(icon, size: 22, color: color),
+            const SizedBox(width: 14),
+            Text(
+              label,
+              style: manrope(
+                size: 15,
+                weight: FontWeight.w600,
+                color: color,
+              ),
+            ),
+          ],
+        ),
       ),
     );
   }

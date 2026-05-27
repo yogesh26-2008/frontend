@@ -1725,44 +1725,79 @@ class _ProfileTileView extends StatelessWidget {
         ? post.thumbnailUrl!
         : post.mediaUrl;
 
-    return ClipRRect(
-      borderRadius: BorderRadius.circular(14),
-      child: Container(
-        decoration: BoxDecoration(
-          gradient: _tileGradient(dark, i),
-        ),
-        child: Stack(
-          fit: StackFit.expand,
-          children: [
-            Image.network(
-              imageUrl,
-              fit: BoxFit.cover,
-              errorBuilder: (_, __, ___) => const SizedBox(),
+    return GestureDetector(
+      behavior: HitTestBehavior.opaque,
+      onTap: () {
+        showDialog(
+          context: context,
+          builder: (context) => Dialog(
+            backgroundColor: Colors.transparent,
+            insetPadding: EdgeInsets.zero,
+            child: Stack(
+              alignment: Alignment.center,
+              children: [
+                InteractiveViewer(
+                  panEnabled: true,
+                  trackpadScrollCausesScale: true,
+                  minScale: 0.5,
+                  maxScale: 4.0,
+                  child: Image.network(
+                    imageUrl,
+                    fit: BoxFit.contain,
+                  ),
+                ),
+                Positioned(
+                  top: 40,
+                  right: 20,
+                  child: IconButton(
+                    icon: const Icon(Icons.close, color: Colors.white, size: 30),
+                    onPressed: () => Navigator.of(context).pop(),
+                  ),
+                ),
+              ],
             ),
-            if (isVideo)
-              Positioned(
-                top: 6,
-                right: 6,
-                child: ClipRRect(
-                  borderRadius: BorderRadius.circular(999),
-                  child: BackdropFilter(
-                    filter: ImageFilter.blur(sigmaX: 8, sigmaY: 8),
-                    child: Container(
-                      padding: const EdgeInsets.symmetric(
-                        horizontal: 6,
-                        vertical: 3,
-                      ),
-                      color: Colors.black.withOpacity(0.42),
-                      child: const Icon(
-                        Icons.play_arrow_rounded,
-                        size: 11,
-                        color: Colors.white,
+          ),
+        );
+      },
+      child: ClipRRect(
+        borderRadius: BorderRadius.circular(14),
+        child: Container(
+          decoration: BoxDecoration(
+            gradient: _tileGradient(dark, i),
+          ),
+          child: Stack(
+            fit: StackFit.expand,
+            children: [
+              Image.network(
+                imageUrl,
+                fit: BoxFit.cover,
+                errorBuilder: (_, __, ___) => const SizedBox(),
+              ),
+              if (isVideo)
+                Positioned(
+                  top: 6,
+                  right: 6,
+                  child: ClipRRect(
+                    borderRadius: BorderRadius.circular(999),
+                    child: BackdropFilter(
+                      filter: ImageFilter.blur(sigmaX: 8, sigmaY: 8),
+                      child: Container(
+                        padding: const EdgeInsets.symmetric(
+                          horizontal: 6,
+                          vertical: 3,
+                        ),
+                        color: Colors.black.withOpacity(0.42),
+                        child: const Icon(
+                          Icons.play_arrow_rounded,
+                          size: 11,
+                          color: Colors.white,
+                        ),
                       ),
                     ),
                   ),
                 ),
-              ),
-          ],
+            ],
+          ),
         ),
       ),
     );

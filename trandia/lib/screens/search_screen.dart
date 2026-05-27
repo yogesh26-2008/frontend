@@ -20,6 +20,7 @@ import '../models/chat_model.dart';
 import '../utils/error_dialog.dart';
 import 'chat_screen.dart';
 import 'user_profile_screen.dart';
+import 'package:speech_to_text/speech_to_text.dart' as stt;
 
 /// ─── BUG FIX: _startChat ────────────────────────────────────────────────────
 /// Previous version had 3 bugs:
@@ -624,11 +625,37 @@ class _SearchInputPill extends StatefulWidget {
 
 class _SearchInputPillState extends State<_SearchInputPill> {
   late TextEditingController _controller;
+  final stt.SpeechToText _speech = stt.SpeechToText();
+  bool _isListening = false;
 
   @override
   void initState() {
     super.initState();
     _controller = TextEditingController(text: widget.value);
+  }
+
+  void _listen() async {
+    if (!_isListening) {
+      bool available = await _speech.initialize(
+        onStatus: (val) => developer.log('onStatus: $val'),
+        onError: (val) => developer.log('onError: $val'),
+      );
+      if (available) {
+        setState(() => _isListening = true);
+        _speech.listen(
+          onResult: (val) => setState(() {
+            _controller.text = val.recognizedWords;
+            if (widget.onChanged != null) widget.onChanged!(val.recognizedWords);
+          }),
+        );
+      } else {
+        setState(() => _isListening = false);
+        _speech.stop();
+      }
+    } else {
+      setState(() => _isListening = false);
+      _speech.stop();
+    }
   }
 
   @override
@@ -716,9 +743,9 @@ class _SearchInputPillState extends State<_SearchInputPill> {
                 )
               else
                 GestureDetector(
-                  onTap: () {},
+                  onTap: _listen,
                   child: SizedBox(width: 32, height: 32,
-                    child: Icon(Icons.mic_none_rounded, size: 18, color: sub)),
+                    child: Icon(_isListening ? Icons.mic_rounded : Icons.mic_none_rounded, size: 18, color: _isListening ? Colors.red : sub)),
                 ),
             ]),
           ]),

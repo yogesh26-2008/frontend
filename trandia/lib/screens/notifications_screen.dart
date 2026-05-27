@@ -211,6 +211,8 @@ class _NotificationsScreenState extends State<NotificationsScreen> {
   List<NfItem> get _filtered {
     switch (_filter) {
       case 'Follows':  return _items.where((n) => n.kind == NfKind.follow).toList();
+      case 'Like':     return _items.where((n) => n.kind == NfKind.like).toList();
+      case 'Comment':  return _items.where((n) => n.kind == NfKind.comment).toList();
       default:         return _items.toList();
     }
   }
@@ -351,6 +353,10 @@ class _NotificationsScreenState extends State<NotificationsScreen> {
                   _Chip(label: 'All',      active: _filter=='All',      count: _unread, dark: dark, onTap: () => setState(() => _filter='All')),
                   const SizedBox(width: 8),
                   _Chip(label: 'Follows',  active: _filter=='Follows',  dark: dark, onTap: () => setState(() => _filter='Follows')),
+                  const SizedBox(width: 8),
+                  _Chip(label: 'Like',     active: _filter=='Like',     dark: dark, onTap: () => setState(() => _filter='Like')),
+                  const SizedBox(width: 8),
+                  _Chip(label: 'Comment',  active: _filter=='Comment',  dark: dark, onTap: () => setState(() => _filter='Comment')),
                 ],
               ),
             ),

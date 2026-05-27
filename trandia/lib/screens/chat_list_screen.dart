@@ -49,6 +49,7 @@ class _ChatListScreenState extends State<ChatListScreen> with WidgetsBindingObse
   String? _myUserId;
   double? _swipeStartX;
   double? _swipeStartY;
+  bool _notificationsOn = true;
 
   @override
   void initState() {
@@ -209,21 +210,16 @@ class _ChatListScreenState extends State<ChatListScreen> with WidgetsBindingObse
                   const Spacer(),
                   GlassCircleButton(
                     dark: widget.dark,
-                    icon: Icons.search_rounded,
+                    icon: _notificationsOn
+                        ? Icons.notifications_outlined
+                        : Icons.notifications_off_outlined,
                     iconSize: 18,
-                    onTap: () => Navigator.of(context).push(
-                      MaterialPageRoute(
-                          builder: (_) => SearchScreen(dark: widget.dark)),
-                    ),
-                  ),
-                  const SizedBox(width: 6),
-                  GlassCircleButton(
-                      dark: widget.dark, icon: Icons.edit_outlined, iconSize: 18),
-                  const SizedBox(width: 6),
-                  GlassCircleButton(
-                    dark: widget.dark,
-                    icon: Icons.notifications_outlined,
-                    iconSize: 18,
+                    onTap: () {
+                      HapticFeedback.heavyImpact();
+                      setState(() {
+                        _notificationsOn = !_notificationsOn;
+                      });
+                    },
                   ),
                 ]),
               ),
@@ -278,7 +274,7 @@ class _ChatListScreenState extends State<ChatListScreen> with WidgetsBindingObse
             Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
               Padding(
                 padding: const EdgeInsets.fromLTRB(16, 0, 16, 6),
-                child: Text('ACTIVE NOW'.tr(context),
+                child: Text('FAVOURITES'.tr(context),
                     style: manrope(
                         size: 11,
                         weight: FontWeight.w700,
@@ -298,6 +294,9 @@ class _ChatListScreenState extends State<ChatListScreen> with WidgetsBindingObse
               ),
             ]),
 
+            const SizedBox(height: 5),
+
+            _buildPillRow(context, widget.dark),
             const SizedBox(height: 5),
 
             // Conversations list
@@ -377,6 +376,85 @@ class _ChatListScreenState extends State<ChatListScreen> with WidgetsBindingObse
             ],
           ),
         ]),
+      ),
+    );
+  }
+
+  Widget _buildPillRow(BuildContext context, bool dark) {
+    return Padding(
+      padding: const EdgeInsets.symmetric(horizontal: 16),
+      child: SingleChildScrollView(
+        scrollDirection: Axis.horizontal,
+        child: Row(
+          children: [
+            _buildPill(context, 'Archived', Icons.archive_outlined, dark, false),
+            const SizedBox(width: 8),
+            _buildPill(context, 'Locked', Icons.lock_outline, dark, false),
+            const SizedBox(width: 8),
+            _buildPill(context, 'Blocked', Icons.block_outlined, dark, false),
+          ],
+        ),
+      ),
+    );
+  }
+
+  Widget _buildPill(BuildContext context, String title, IconData icon, bool dark, bool isActive) {
+    final fg = GlassTokens.fg(dark);
+    final sub = GlassTokens.sub(dark);
+    final bgColor = isActive 
+        ? (dark ? Colors.white.withOpacity(0.15) : Colors.black.withOpacity(0.1))
+        : (dark ? Colors.white.withOpacity(0.05) : Colors.black.withOpacity(0.03));
+        
+    return GestureDetector(
+      onTap: () {
+        HapticFeedback.selectionClick();
+        if (title != 'Chats') {
+          Navigator.of(context).push(
+            MaterialPageRoute(
+              builder: (_) => Scaffold(
+                backgroundColor: dark ? GlassTokens.bgDark : GlassTokens.bgLight,
+                appBar: AppBar(
+                  backgroundColor: Colors.transparent,
+                  elevation: 0,
+                  iconTheme: IconThemeData(color: fg),
+                  title: Text(title.tr(context), style: manrope(size: 17, weight: FontWeight.w700, color: fg)),
+                ),
+                body: Stack(
+                  children: [
+                    GlassBackdrop(dark: dark),
+                  ],
+                ),
+              ),
+            ),
+          );
+        }
+      },
+      child: Container(
+        padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 8),
+        decoration: BoxDecoration(
+          color: bgColor,
+          borderRadius: BorderRadius.circular(999),
+          border: Border.all(
+            color: isActive 
+                ? (dark ? Colors.white.withOpacity(0.2) : Colors.black.withOpacity(0.2))
+                : Colors.transparent,
+          ),
+        ),
+        child: Row(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            Icon(icon, size: 16, color: isActive ? fg : sub),
+            const SizedBox(width: 6),
+            Text(
+              title.tr(context),
+              style: manrope(
+                size: 13,
+                weight: isActive ? FontWeight.w700 : FontWeight.w600,
+                color: isActive ? fg : sub,
+              ),
+            ),
+          ],
+        ),
       ),
     );
   }

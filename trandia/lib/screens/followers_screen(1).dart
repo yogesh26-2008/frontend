@@ -566,6 +566,50 @@ class _TopBar extends StatelessWidget {
             size: 38,
             icon: Icons.swap_vert_rounded,
             iconSize: 20,
+            onTap: () {
+              showModalBottomSheet(
+                context: context,
+                backgroundColor: dark ? const Color(0xFF1C1C1F) : Colors.white,
+                shape: const RoundedRectangleBorder(
+                  borderRadius: BorderRadius.vertical(top: Radius.circular(20)),
+                ),
+                builder: (ctx) => SafeArea(
+                  child: Padding(
+                    padding: const EdgeInsets.fromLTRB(16, 12, 16, 8),
+                    child: Column(
+                      mainAxisSize: MainAxisSize.min,
+                      children: [
+                        Container(
+                          width: 36,
+                          height: 4,
+                          margin: const EdgeInsets.only(bottom: 16),
+                          decoration: BoxDecoration(
+                            color: dark ? Colors.white24 : Colors.black12,
+                            borderRadius: BorderRadius.circular(2),
+                          ),
+                        ),
+                        ListTile(
+                          leading: Icon(Icons.arrow_upward_rounded, color: _Tk.fg(dark)),
+                          title: Text(
+                            'New follower',
+                            style: TextStyle(color: _Tk.fg(dark), fontWeight: FontWeight.w600),
+                          ),
+                          onTap: () => Navigator.pop(ctx),
+                        ),
+                        ListTile(
+                          leading: Icon(Icons.arrow_downward_rounded, color: _Tk.fg(dark)),
+                          title: Text(
+                            'Old follower',
+                            style: TextStyle(color: _Tk.fg(dark), fontWeight: FontWeight.w600),
+                          ),
+                          onTap: () => Navigator.pop(ctx),
+                        ),
+                      ],
+                    ),
+                  ),
+                ),
+              );
+            },
           ),
         ],
       ),

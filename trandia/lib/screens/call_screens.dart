@@ -369,7 +369,10 @@ class _VoiceCallScreenState extends State<VoiceCallScreen>
       };
 
     try {
-      await _agora.joinVoiceCall(channelName: widget.channelName);
+      await _agora.joinVoiceCall(
+        channelName: widget.channelName,
+        uid: AgoraService.buildNumericUid(widget.myUserId),
+      );
     } catch (e) {
       if (mounted) {
         ScaffoldMessenger.of(context)
@@ -648,7 +651,10 @@ class _VideoCallScreenState extends State<VideoCallScreen>
       };
 
     try {
-      await _agora.joinVideoCall(channelName: widget.channelName);
+      await _agora.joinVideoCall(
+        channelName: widget.channelName,
+        uid: AgoraService.buildNumericUid(widget.myUserId),
+      );
     } catch (e) {
       if (mounted) {
         ScaffoldMessenger.of(context)

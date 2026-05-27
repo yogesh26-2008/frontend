@@ -75,6 +75,7 @@ class _HomeScreenState extends State<HomeScreen>
   StreamSubscription? _wsNotifSub;
   StreamSubscription? _callSub;
   String? _myUserId;
+  bool _incomingCallOpen = false;
 
   // ── Feed state ────────────────────────────────────
   final List<PostModel> _posts       = [];
@@ -117,9 +118,8 @@ class _HomeScreenState extends State<HomeScreen>
       _loadUnreadNotifCount();
       ChatService().connectWebSocket();
       _listenForNewNotifications();
-      _listenForIncomingCalls();
+      _loadMyUserId().then((_) => _listenForIncomingCalls());
       _loadFeed();
-      _loadMyUserId();
     });
   }
 
@@ -140,12 +140,18 @@ class _HomeScreenState extends State<HomeScreen>
   }
 
   void _listenForIncomingCalls() {
+    if (_callSub != null) return;
     _callSub = ChatService().callStream.listen((data) {
       final type = data['type'] as String?;
       if (type != 'call_invite') return;
       if (!mounted) return;
+      if (_incomingCallOpen) return;
       final isDark   = Theme.of(context).brightness == Brightness.dark;
       final myId     = _myUserId ?? '';
+      final callerId = (data['caller_id'] as String?) ?? '';
+      final channelName = (data['channel_name'] as String?) ?? '';
+      if (myId.isEmpty || callerId.isEmpty || channelName.isEmpty) return;
+      _incomingCallOpen = true;
       Navigator.of(context, rootNavigator: true).push(
         PageRouteBuilder(
           pageBuilder: (_, anim, __) => FadeTransition(
@@ -153,8 +159,8 @@ class _HomeScreenState extends State<HomeScreen>
             child: IncomingCallScreen(
               dark:        isDark,
               callerName:  (data['caller_name'] as String?) ?? 'Unknown',
-              callerId:    (data['caller_id']   as String?) ?? '',
-              channelName: (data['channel_name'] as String?) ?? '',
+              callerId:    callerId,
+              channelName: channelName,
               callType:    (data['call_type']   as String?) ?? 'voice',
               myUserId:    myId,
             ),
@@ -162,7 +168,7 @@ class _HomeScreenState extends State<HomeScreen>
           transitionDuration: const Duration(milliseconds: 400),
           opaque: false,
         ),
-      );
+      ).whenComplete(() => _incomingCallOpen = false);
     });
   }
 

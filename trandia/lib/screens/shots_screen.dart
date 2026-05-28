@@ -18,11 +18,13 @@ import 'package:cached_network_image/cached_network_image.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:video_player/video_player.dart';
+import 'package:image_picker/image_picker.dart';
 
 import '../l10n/app_localizations.dart';
 import '../services/post_service.dart';
 import 'glass_common.dart';
 import 'comments_screen.dart';
+import 'create_post_screens.dart';
 import '../utils/share_helper.dart';
 
 // ───────────────────────────────────────────────────────────────
@@ -313,6 +315,127 @@ class _ShotsScreenState extends State<ShotsScreen>
     }
   }
 
+  Future<void> _openShotsCamera() async {
+    showModalBottomSheet(
+      context: context,
+      backgroundColor: const Color(0xFF1C1C1F),
+      shape: const RoundedRectangleBorder(
+        borderRadius: BorderRadius.vertical(top: Radius.circular(24)),
+      ),
+      builder: (ctx) => SafeArea(
+        child: Padding(
+          padding: const EdgeInsets.fromLTRB(20, 16, 20, 12),
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              Container(
+                width: 40,
+                height: 4,
+                margin: const EdgeInsets.only(bottom: 20),
+                decoration: BoxDecoration(
+                  color: Colors.white24,
+                  borderRadius: BorderRadius.circular(2),
+                ),
+              ),
+              const Text(
+                'Create a Shot',
+                style: TextStyle(
+                  fontFamily: 'Manrope',
+                  fontSize: 16,
+                  fontWeight: FontWeight.w800,
+                  color: Colors.white,
+                ),
+              ),
+              const SizedBox(height: 20),
+              GestureDetector(
+                onTap: () async {
+                  Navigator.pop(ctx);
+                  final picker = ImagePicker();
+                  final file = await picker.pickVideo(source: ImageSource.camera);
+                  if (file != null && mounted) {
+                    Navigator.of(context).push(
+                      MaterialPageRoute(
+                        builder: (_) => CreatePostEditScreen(
+                          dark: widget.dark,
+                          file: file,
+                          isVideo: true,
+                        ),
+                      ),
+                    );
+                  }
+                },
+                child: Container(
+                  padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 14),
+                  decoration: BoxDecoration(
+                    borderRadius: BorderRadius.circular(16),
+                    color: Colors.white.withOpacity(0.07),
+                  ),
+                  child: const Row(
+                    children: [
+                      Icon(Icons.videocam_rounded, size: 22, color: Colors.white),
+                      SizedBox(width: 14),
+                      Text(
+                        'Record Video (Camera)',
+                        style: TextStyle(
+                          fontFamily: 'Manrope',
+                          fontSize: 15,
+                          fontWeight: FontWeight.w600,
+                          color: Colors.white,
+                        ),
+                      ),
+                    ],
+                  ),
+                ),
+              ),
+              const SizedBox(height: 10),
+              GestureDetector(
+                onTap: () async {
+                  Navigator.pop(ctx);
+                  final picker = ImagePicker();
+                  final file = await picker.pickVideo(source: ImageSource.gallery);
+                  if (file != null && mounted) {
+                    Navigator.of(context).push(
+                      MaterialPageRoute(
+                        builder: (_) => CreatePostEditScreen(
+                          dark: widget.dark,
+                          file: file,
+                          isVideo: true,
+                        ),
+                      ),
+                    );
+                  }
+                },
+                child: Container(
+                  padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 14),
+                  decoration: BoxDecoration(
+                    borderRadius: BorderRadius.circular(16),
+                    color: Colors.white.withOpacity(0.07),
+                  ),
+                  child: const Row(
+                    children: [
+                      Icon(Icons.video_library_rounded, size: 22, color: Colors.white),
+                      SizedBox(width: 14),
+                      Text(
+                        'Choose Video (Gallery)',
+                        style: TextStyle(
+                          fontFamily: 'Manrope',
+                          fontSize: 15,
+                          fontWeight: FontWeight.w600,
+                          color: Colors.white,
+                        ),
+                      ),
+                    ],
+                  ),
+                ),
+              ),
+              const SizedBox(height: 8),
+            ],
+          ),
+        ),
+      ),
+    );
+  }
+
   Future<void> _showLearnNudge() async {
     // Pause current video while dialog is up
     _ctrls[_curIdx]?.pause();
@@ -383,6 +506,7 @@ class _ShotsScreenState extends State<ShotsScreen>
             feed:   _feed,
             onTap:  _setFeed,
             onExit: () => Navigator.of(context).pop(),
+            onCamera: _openShotsCamera,
           ),
         ),
 
@@ -809,14 +933,15 @@ class _TopBar extends StatelessWidget {
   final ShotsFeed           feed;
   final ValueChanged<ShotsFeed> onTap;
   final VoidCallback            onExit;
-  const _TopBar({required this.feed, required this.onTap, required this.onExit});
+  final VoidCallback?           onCamera;
+  const _TopBar({required this.feed, required this.onTap, required this.onExit, this.onCamera});
 
   @override
   Widget build(BuildContext context) => Row(
     children: [
       _BareIcon(icon: Icons.arrow_back_ios_new, size: 22, onTap: onExit),
       Expanded(child: Center(child: _FeedPill(feed: feed, onTap: onTap))),
-      _BareIcon(icon: Icons.photo_camera_outlined, size: 24, onTap: () {}),
+      _BareIcon(icon: Icons.photo_camera_outlined, size: 24, onTap: onCamera),
     ],
   );
 }

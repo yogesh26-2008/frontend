@@ -83,6 +83,11 @@ class AgoraService {
     engine.registerEventHandler(RtcEngineEventHandler(
       onJoinChannelSuccess: (RtcConnection conn, int elapsed) {
         developer.log('[Agora] Joined: ${conn.channelId}');
+        // Set speakerphone after joining — calling it before joinChannel causes
+        // ERR_ADM_INIT_PLAYOUT on many Android devices.
+        if (currentCallType == CallType.voice) {
+          engine.setEnableSpeakerphone(isSpeakerOn);
+        }
         callState = CallState.connecting;
         onCallStateChanged?.call(callState);
       },
@@ -139,7 +144,6 @@ class AgoraService {
     // Voice only — disable video explicitly
     await engine.enableAudio();
     await engine.disableVideo();
-    await engine.setEnableSpeakerphone(true);
 
     await engine.joinChannel(
       token:     token,

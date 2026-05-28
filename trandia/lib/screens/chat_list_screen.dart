@@ -339,29 +339,24 @@ class _ChatListScreenState extends State<ChatListScreen> with WidgetsBindingObse
                   MaterialPageRoute(
                       builder: (_) => SearchScreen(dark: widget.dark)),
                 ),
-                child: Container(
+                child: SizedBox(
                   height: 42,
-                  padding: const EdgeInsets.symmetric(horizontal: 16),
-                  decoration: BoxDecoration(
-                    color: widget.dark
-                        ? Colors.white.withOpacity(0.06)
-                        : Colors.white.withOpacity(0.6),
-                    border: Border.all(
-                        color: widget.dark
-                            ? Colors.white.withOpacity(0.10)
-                            : Colors.white.withOpacity(0.95)),
-                    borderRadius: BorderRadius.circular(999),
+                  child: GlassSurface(
+                    dark: widget.dark,
+                    radius: 999,
+                    padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 0),
+                    blurSigma: 28,
+                    child: Row(children: [
+                      Icon(Icons.search_rounded, size: 18, color: sub),
+                      const SizedBox(width: 10),
+                      Text('Search'.tr(context),
+                          style: manrope(
+                              size: 14,
+                              weight: FontWeight.w500,
+                              color: sub,
+                              letterSpacing: -0.07)),
+                    ]),
                   ),
-                  child: Row(children: [
-                    Icon(Icons.search_rounded, size: 18, color: sub),
-                    const SizedBox(width: 10),
-                    Text('Search'.tr(context),
-                        style: manrope(
-                            size: 14,
-                            weight: FontWeight.w500,
-                            color: sub,
-                            letterSpacing: -0.07)),
-                  ]),
                 ),
               ),
             ),

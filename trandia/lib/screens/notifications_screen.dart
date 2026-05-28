@@ -125,9 +125,16 @@ class _NotificationsScreenState extends State<NotificationsScreen> {
   StreamSubscription? _fcmSub;
   StreamSubscription? _wsNotifSub;
 
+  // Pagination
+  static const int _pageSize = 40;
+  bool _isLoadingMore = false;
+  bool _hasMore = true;
+  int _skip = 0;
+
   @override
   void initState() {
     super.initState();
+    _scroll.addListener(_onScroll);
     _fetchNotifications();
     _listenForRealtimeNotifications();
   }
@@ -140,24 +147,62 @@ class _NotificationsScreenState extends State<NotificationsScreen> {
     super.dispose();
   }
 
+  void _onScroll() {
+    if (_scroll.position.pixels >= _scroll.position.maxScrollExtent - 200) {
+      _fetchMoreNotifications();
+    }
+  }
+
   Future<void> _fetchNotifications() async {
-    setState(() { _loading = true; _error = false; });
+    setState(() { _loading = true; _error = false; _skip = 0; _hasMore = true; });
     try {
       final data = await ApiService.getList(
-        '/notifications?limit=50',
+        '/notifications?limit=$_pageSize',
         requiresAuth: true,
       );
       final items = data
           .map((d) => NfItem.fromJson(d as Map<String, dynamic>))
           .toList();
       if (mounted) {
-        setState(() { _items = items; _loading = false; });
+        setState(() {
+          _items = items;
+          _skip = items.length;
+          _hasMore = items.length == _pageSize;
+          _loading = false;
+        });
       }
     } catch (e) {
       debugPrint('[Notifications] fetch error: $e');
       if (mounted) {
         setState(() { _loading = false; _error = true; });
       }
+    }
+  }
+
+  Future<void> _fetchMoreNotifications() async {
+    if (_isLoadingMore || !_hasMore) return;
+    setState(() => _isLoadingMore = true);
+    try {
+      final data = await ApiService.getList(
+        '/notifications?skip=$_skip&limit=$_pageSize',
+        requiresAuth: true,
+      );
+      final newItems = data
+          .map((d) => NfItem.fromJson(d as Map<String, dynamic>))
+          .toList();
+      if (mounted) {
+        setState(() {
+          for (final item in newItems) {
+            if (!_isDuplicate(item.id)) _items.add(item);
+          }
+          _skip += newItems.length;
+          _hasMore = newItems.length == _pageSize;
+          _isLoadingMore = false;
+        });
+      }
+    } catch (e) {
+      debugPrint('[Notifications] fetch more error: $e');
+      if (mounted) setState(() => _isLoadingMore = false);
     }
   }
 
@@ -374,23 +419,40 @@ class _NotificationsScreenState extends State<NotificationsScreen> {
         controller: _scroll,
         physics: const AlwaysScrollableScrollPhysics(),
         padding: EdgeInsets.only(top: listInnerTopPadding, bottom: 40, left: 10, right: 10),
-        itemCount: items.length,
+        itemCount: items.length + (_isLoadingMore ? 1 : 0),
         addAutomaticKeepAlives: false,
-        itemBuilder: (context, i) => RepaintBoundary(
-          key: ValueKey(items[i].id.isEmpty ? i.toString() : items[i].id),
-          child: Padding(
-            padding: const EdgeInsets.only(bottom: _kCardGap),
-            child: SizedBox(
-              height: _kCardHeight,
-              child: _NfCardInner(
-                n: items[i],
-                i: i,
-                dark: dark,
-                onDelete: () => _deleteNotification(items[i]),
+        itemBuilder: (context, i) {
+          if (i >= items.length) {
+            return Padding(
+              padding: const EdgeInsets.symmetric(vertical: 16),
+              child: Center(
+                child: SizedBox(
+                  width: 20,
+                  height: 20,
+                  child: CircularProgressIndicator(
+                    strokeWidth: 2,
+                    color: dark ? Colors.white : Colors.black,
+                  ),
+                ),
+              ),
+            );
+          }
+          return RepaintBoundary(
+            key: ValueKey(items[i].id.isEmpty ? i.toString() : items[i].id),
+            child: Padding(
+              padding: const EdgeInsets.only(bottom: _kCardGap),
+              child: SizedBox(
+                height: _kCardHeight,
+                child: _NfCardInner(
+                  n: items[i],
+                  i: i,
+                  dark: dark,
+                  onDelete: () => _deleteNotification(items[i]),
+                ),
               ),
             ),
-          ),
-        ),
+          );
+        },
       ),
     );
   }

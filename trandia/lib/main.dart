@@ -5,6 +5,7 @@ import 'package:firebase_messaging/firebase_messaging.dart';
 import 'package:flutter/material.dart';
 
 import 'firebase_options.dart';
+import 'screens/home/home_screen.dart';
 import 'screens/interest_screen.dart';
 import 'screens/splash_screen.dart';
 import 'screens/intro_slides.dart';
@@ -181,7 +182,6 @@ class _StartupRouterState extends State<_StartupRouter> {
 
     final isLoggedIn = await AuthService.isLoggedIn();
     if (!mounted) return;
-<<<<<<< HEAD
 
     if (!isLoggedIn) {
       Navigator.of(context).pushReplacement(
@@ -215,14 +215,6 @@ class _StartupRouterState extends State<_StartupRouter> {
         MaterialPageRoute(builder: (_) => const HomeScreen()),
       );
     }
-=======
-    Navigator.of(context).pushReplacement(
-      MaterialPageRoute(
-        builder: (_) =>
-            isLoggedIn ? const InterestGateScreen() : const IntroSlidesScreen(),
-      ),
-    );
->>>>>>> c9896ad09bdde8620d9cc9dd8556ab2c6486011a
   }
 
   @override

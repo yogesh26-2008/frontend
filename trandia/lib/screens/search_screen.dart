@@ -674,81 +674,87 @@ class _SearchInputPillState extends State<_SearchInputPill> {
     final sub = GlassTokens.sub(dark);
     final hasText = _controller.text.isNotEmpty;
 
-    return ClipRRect(
-      borderRadius: BorderRadius.circular(999),
-      child: BackdropFilter(
-        filter: ImageFilter.blur(sigmaX: 24, sigmaY: 24),
-        child: Container(
-          height: 44,
-          padding: const EdgeInsets.only(left: 14, right: 6),
-          decoration: BoxDecoration(
-            gradient: LinearGradient(
-              begin: Alignment.topCenter, end: Alignment.bottomCenter,
-              colors: dark
-                ? [Colors.white.withOpacity(0.10), Colors.white.withOpacity(0.04)]
-                : [Colors.white.withOpacity(0.85), Colors.white.withOpacity(0.62)],
-            ),
-            border: Border.all(color: dark ? Colors.white.withOpacity(0.12) : Colors.white.withOpacity(0.95)),
-            borderRadius: BorderRadius.circular(999),
-            boxShadow: [
-              BoxShadow(
-                color: dark ? Colors.black.withOpacity(0.7) : const Color(0xFF14161E).withOpacity(0.20),
-                blurRadius: 28, offset: const Offset(0, 12), spreadRadius: -14,
-              ),
-            ],
-          ),
-          child: Stack(alignment: Alignment.center, children: [
-            Positioned(
-              top: 0, left: 20, right: 20, height: 1,
-              child: Container(
-                decoration: BoxDecoration(
-                  gradient: LinearGradient(colors: dark
-                    ? [Colors.transparent, Colors.white.withOpacity(0.22), Colors.transparent]
-                    : [Colors.transparent, Colors.white, Colors.transparent]),
+    return Hero(
+      tag: 'chat_search_bar',
+      child: Material(
+        color: Colors.transparent,
+        child: ClipRRect(
+          borderRadius: BorderRadius.circular(999),
+          child: BackdropFilter(
+            filter: ImageFilter.blur(sigmaX: 24, sigmaY: 24),
+            child: Container(
+              height: 44,
+              padding: const EdgeInsets.only(left: 14, right: 6),
+              decoration: BoxDecoration(
+                gradient: LinearGradient(
+                  begin: Alignment.topCenter, end: Alignment.bottomCenter,
+                  colors: dark
+                    ? [Colors.white.withOpacity(0.10), Colors.white.withOpacity(0.04)]
+                    : [Colors.white.withOpacity(0.85), Colors.white.withOpacity(0.62)],
                 ),
-              ),
-            ),
-            Row(children: [
-              Icon(Icons.search_rounded, size: 18, color: hasText ? fg : sub),
-              const SizedBox(width: 10),
-              Expanded(child: TextField(
-                controller: _controller,
-                onChanged: (val) {
-                  setState(() {});
-                  if (widget.onChanged != null) widget.onChanged!(val);
-                },
-                style: manrope(size: 14.5, weight: hasText ? FontWeight.w600 : FontWeight.w500,
-                  color: fg, letterSpacing: -0.145),
-                decoration: InputDecoration(
-                  hintText: widget.placeholder,
-                  hintStyle: manrope(size: 14.5, weight: FontWeight.w500, color: sub, letterSpacing: -0.145),
-                  border: InputBorder.none, isDense: true, contentPadding: EdgeInsets.zero,
-                ),
-                keyboardType: TextInputType.text,
-                autocorrect: false,
-                enableSuggestions: false,
-              )),
-              const SizedBox(width: 6),
-              if (hasText)
-                GestureDetector(
-                  onTap: () { _controller.clear(); setState(() {}); widget.onClear(); },
-                  child: Container(
-                    width: 26, height: 26, alignment: Alignment.center,
-                    decoration: BoxDecoration(
-                      shape: BoxShape.circle,
-                      color: dark ? Colors.white.withOpacity(0.12) : Colors.black.withOpacity(0.08),
-                    ),
-                    child: Icon(Icons.close_rounded, size: 14, color: fg),
+                border: Border.all(color: dark ? Colors.white.withOpacity(0.12) : Colors.white.withOpacity(0.95)),
+                borderRadius: BorderRadius.circular(999),
+                boxShadow: [
+                  BoxShadow(
+                    color: dark ? Colors.black.withOpacity(0.7) : const Color(0xFF14161E).withOpacity(0.20),
+                    blurRadius: 28, offset: const Offset(0, 12), spreadRadius: -14,
                   ),
-                )
-              else
-                GestureDetector(
-                  onTap: _listen,
-                  child: SizedBox(width: 32, height: 32,
-                    child: Icon(_isListening ? Icons.mic_rounded : Icons.mic_none_rounded, size: 18, color: _isListening ? Colors.red : sub)),
+                ],
+              ),
+              child: Stack(alignment: Alignment.center, children: [
+                Positioned(
+                  top: 0, left: 20, right: 20, height: 1,
+                  child: Container(
+                    decoration: BoxDecoration(
+                      gradient: LinearGradient(colors: dark
+                        ? [Colors.transparent, Colors.white.withOpacity(0.22), Colors.transparent]
+                        : [Colors.transparent, Colors.white, Colors.transparent]),
+                    ),
+                  ),
                 ),
-            ]),
-          ]),
+                Row(children: [
+                  Icon(Icons.search_rounded, size: 18, color: hasText ? fg : sub),
+                  const SizedBox(width: 10),
+                  Expanded(child: TextField(
+                    controller: _controller,
+                    onChanged: (val) {
+                      setState(() {});
+                      if (widget.onChanged != null) widget.onChanged!(val);
+                    },
+                    style: manrope(size: 14.5, weight: hasText ? FontWeight.w600 : FontWeight.w500,
+                      color: fg, letterSpacing: -0.145),
+                    decoration: InputDecoration(
+                      hintText: widget.placeholder,
+                      hintStyle: manrope(size: 14.5, weight: FontWeight.w500, color: sub, letterSpacing: -0.145),
+                      border: InputBorder.none, isDense: true, contentPadding: EdgeInsets.zero,
+                    ),
+                    keyboardType: TextInputType.text,
+                    autocorrect: false,
+                    enableSuggestions: false,
+                  )),
+                  const SizedBox(width: 6),
+                  if (hasText)
+                    GestureDetector(
+                      onTap: () { _controller.clear(); setState(() {}); widget.onClear(); },
+                      child: Container(
+                        width: 26, height: 26, alignment: Alignment.center,
+                        decoration: BoxDecoration(
+                          shape: BoxShape.circle,
+                          color: dark ? Colors.white.withOpacity(0.12) : Colors.black.withOpacity(0.08),
+                        ),
+                        child: Icon(Icons.close_rounded, size: 14, color: fg),
+                      ),
+                    )
+                  else
+                    GestureDetector(
+                      onTap: _listen,
+                      child: SizedBox(width: 32, height: 32,
+                        child: Icon(_isListening ? Icons.mic_rounded : Icons.mic_none_rounded, size: 18, color: _isListening ? Colors.red : sub)),
+                    ),
+                ]),
+              ]),
+            ),
+          ),
         ),
       ),
     );

@@ -358,42 +358,15 @@ class _ChatListScreenState extends State<ChatListScreen> with WidgetsBindingObse
                             child: _buildConversationList(context, sub),
                           ),
               ),
-
-              // Search bar
-              Padding(
-                padding: const EdgeInsets.fromLTRB(12, 8, 12, 12),
-                child: GestureDetector(
-                  onTap: () => Navigator.of(context).push(
-                    MaterialPageRoute(
-                        builder: (_) => SearchScreen(dark: widget.dark)),
-                  ),
-                  child: Container(
-                    height: 42,
-                    padding: const EdgeInsets.symmetric(horizontal: 16),
-                    decoration: BoxDecoration(
-                      color: widget.dark
-                          ? Colors.white.withOpacity(0.06)
-                          : Colors.white.withOpacity(0.6),
-                      border: Border.all(
-                          color: widget.dark
-                              ? Colors.white.withOpacity(0.10)
-                              : Colors.white.withOpacity(0.95)),
-                      borderRadius: BorderRadius.circular(999),
-                    ),
-                    child: Row(children: [
-                      Icon(Icons.search_rounded, size: 18, color: sub),
-                      const SizedBox(width: 10),
-                      Text('Search'.tr(context),
-                          style: manrope(
-                              size: 14,
-                              weight: FontWeight.w500,
-                              color: sub,
-                              letterSpacing: -0.07)),
-                    ]),
-                  ),
-                ),
-              ),
             ],
+          ),
+
+          // Floating Search Bar at the bottom
+          Positioned(
+            left: 16,
+            right: 16,
+            bottom: MediaQuery.paddingOf(context).bottom + 16,
+            child: _AnimatedFloatingSearchBar(dark: widget.dark),
           ),
         ]),
       ),
@@ -402,8 +375,9 @@ class _ChatListScreenState extends State<ChatListScreen> with WidgetsBindingObse
 
   Widget _buildConversationList(BuildContext context, Color sub) {
     final list = _filteredConversations;
+    final bottomInset = MediaQuery.paddingOf(context).bottom;
     return ListView.builder(
-      padding: const EdgeInsets.fromLTRB(0, 0, 0, 16),
+      padding: EdgeInsets.fromLTRB(0, 0, 0, 84 + bottomInset),
       itemCount: 1 + (list.isEmpty ? 1 : list.length),
       itemBuilder: (context, index) {
         if (index == 0) {
@@ -1153,5 +1127,114 @@ class _ChatRow extends StatelessWidget {
     if (diff.inHours > 0) return '${diff.inHours}h';
     if (diff.inMinutes > 0) return '${diff.inMinutes}m';
     return 'now'.tr(context);
+  }
+}
+
+class _AnimatedFloatingSearchBar extends StatefulWidget {
+  final bool dark;
+  const _AnimatedFloatingSearchBar({required this.dark});
+
+  @override
+  State<_AnimatedFloatingSearchBar> createState() => _AnimatedFloatingSearchBarState();
+}
+
+class _AnimatedFloatingSearchBarState extends State<_AnimatedFloatingSearchBar>
+    with SingleTickerProviderStateMixin {
+  late AnimationController _controller;
+  late Animation<double> _scaleAnimation;
+
+  @override
+  void initState() {
+    super.initState();
+    _controller = AnimationController(
+      vsync: this,
+      duration: const Duration(milliseconds: 100),
+    );
+    _scaleAnimation = Tween<double>(begin: 1.0, end: 0.95).animate(
+      CurvedAnimation(parent: _controller, curve: Curves.easeInOut),
+    );
+  }
+
+  @override
+  void dispose() {
+    _controller.dispose();
+    super.dispose();
+  }
+
+  void _onTapDown(TapDownDetails details) {
+    _controller.forward();
+  }
+
+  void _onTapUp(TapUpDetails details) {
+    _controller.reverse();
+    HapticFeedback.selectionClick();
+    _navigateToSearch();
+  }
+
+  void _onTapCancel() {
+    _controller.reverse();
+  }
+
+  void _navigateToSearch() {
+    Navigator.of(context).push(
+      PageRouteBuilder(
+        pageBuilder: (_, animation, __) => SearchScreen(dark: widget.dark),
+        transitionDuration: const Duration(milliseconds: 350),
+        reverseTransitionDuration: const Duration(milliseconds: 280),
+        transitionsBuilder: (_, animation, __, child) {
+          final curved = CurvedAnimation(
+            parent: animation,
+            curve: Curves.easeOutCubic,
+            reverseCurve: Curves.easeInCubic,
+          );
+          return FadeTransition(
+            opacity: curved,
+            child: child,
+          );
+        },
+      ),
+    );
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final sub = GlassTokens.sub(widget.dark);
+
+    return ScaleTransition(
+      scale: _scaleAnimation,
+      child: GestureDetector(
+        onTapDown: _onTapDown,
+        onTapUp: _onTapUp,
+        onTapCancel: _onTapCancel,
+        child: Hero(
+          tag: 'chat_search_bar',
+          child: GlassSurface(
+            dark: widget.dark,
+            radius: 999,
+            padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 10),
+            child: Material(
+              color: Colors.transparent,
+              child: Row(
+                children: [
+                  Icon(Icons.search_rounded, size: 18, color: sub),
+                  const SizedBox(width: 10),
+                  Expanded(
+                    child: Text(
+                      'Search'.tr(context),
+                      style: manrope(
+                        size: 14,
+                        weight: FontWeight.w500,
+                        color: sub,
+                        letterSpacing: -0.07,
+                      ),
+                    ),
+                  ),
+                ],
+              ),
+            ),
+          ),
+        ),
+      ),
+    );
   }
 }

@@ -711,55 +711,92 @@ class _ShotVideoPage extends StatelessWidget {
     final ctrl    = controller;
     final isReady = ctrl != null && ctrl.value.isInitialized;
 
-    return SizedBox.expand(
-      child: Stack(fit: StackFit.expand, children: [
+    return GestureDetector(
+      behavior: HitTestBehavior.opaque,
+      onTap: () {
+        if (ctrl != null && ctrl.value.isInitialized) {
+          if (ctrl.value.isPlaying) {
+            ctrl.pause();
+          } else {
+            ctrl.play();
+          }
+        }
+      },
+      child: SizedBox.expand(
+        child: Stack(fit: StackFit.expand, children: [
 
-        // ── Thumbnail always shown as background ───────────────
-        if (thumbnailUrl != null && thumbnailUrl!.isNotEmpty)
-          CachedNetworkImage(
-            imageUrl:         thumbnailUrl!,
-            fit:              BoxFit.cover,
-            memCacheWidth:    400,   // cap in-memory decode size → less RAM
-            maxWidthDiskCache: 400,  // cap on-disk cached size → less storage
-            placeholder: (_, __) => Container(color: Colors.black),
-            errorWidget: (_, __, ___) => Container(color: Colors.black),
-          )
-        else
-          Container(color: Colors.black),
+          // ── Thumbnail always shown as background ───────────────
+          if (thumbnailUrl != null && thumbnailUrl!.isNotEmpty)
+            CachedNetworkImage(
+              imageUrl:         thumbnailUrl!,
+              fit:              BoxFit.cover,
+              memCacheWidth:    400,   // cap in-memory decode size → less RAM
+              maxWidthDiskCache: 400,  // cap on-disk cached size → less storage
+              placeholder: (_, __) => Container(color: Colors.black),
+              errorWidget: (_, __, ___) => Container(color: Colors.black),
+            )
+          else
+            Container(color: Colors.black),
 
-        // ── Video player (covers thumbnail once ready) ─────────
-        if (isReady)
-          FittedBox(
-            fit: BoxFit.cover,
-            child: SizedBox(
-              width:  ctrl.value.size.width,
-              height: ctrl.value.size.height,
-              child:  VideoPlayer(ctrl),
-            ),
-          ),
-
-        // ── Loading spinner while controller initialises ────────
-        if (!isReady)
-          Center(child: SizedBox(width: 30, height: 30,
-            child: CircularProgressIndicator(
-              color:       Colors.white.withOpacity(0.35),
-              strokeWidth: 2,
-            ))),
-
-        // ── Progress bar at bottom edge ────────────────────────
-        if (isReady)
-          Positioned(bottom: 0, left: 0, right: 0,
-            child: VideoProgressIndicator(
-              ctrl,
-              allowScrubbing: false,
-              padding:        EdgeInsets.zero,
-              colors: VideoProgressColors(
-                playedColor:     Colors.white,
-                bufferedColor:   Colors.white.withOpacity(0.30),
-                backgroundColor: Colors.transparent,
+          // ── Video player (covers thumbnail once ready) ─────────
+          if (isReady)
+            FittedBox(
+              fit: BoxFit.cover,
+              child: SizedBox(
+                width:  ctrl.value.size.width,
+                height: ctrl.value.size.height,
+                child:  VideoPlayer(ctrl),
               ),
-            )),
-      ]),
+            ),
+
+          // ── Play/Pause Icon Overlay ─────────────────────────────
+          if (ctrl != null)
+            ValueListenableBuilder(
+              valueListenable: ctrl,
+              builder: (context, VideoPlayerValue value, child) {
+                if (!value.isInitialized || value.isPlaying) {
+                  return const SizedBox.shrink();
+                }
+                return Center(
+                  child: Container(
+                    padding: const EdgeInsets.all(16),
+                    decoration: BoxDecoration(
+                      color: Colors.black.withOpacity(0.4),
+                      shape: BoxShape.circle,
+                    ),
+                    child: const Icon(
+                      Icons.play_arrow_rounded,
+                      color: Colors.white,
+                      size: 64,
+                    ),
+                  ),
+                );
+              },
+            ),
+
+          // ── Loading spinner while controller initialises ────────
+          if (!isReady)
+            Center(child: SizedBox(width: 30, height: 30,
+              child: CircularProgressIndicator(
+                color:       Colors.white.withOpacity(0.35),
+                strokeWidth: 2,
+              ))),
+
+          // ── Progress bar at bottom edge ────────────────────────
+          if (isReady)
+            Positioned(bottom: 0, left: 0, right: 0,
+              child: VideoProgressIndicator(
+                ctrl,
+                allowScrubbing: false,
+                padding:        EdgeInsets.zero,
+                colors: VideoProgressColors(
+                  playedColor:     Colors.white,
+                  bufferedColor:   Colors.white.withOpacity(0.30),
+                  backgroundColor: Colors.transparent,
+                ),
+              )),
+        ]),
+      ),
     );
   }
 }

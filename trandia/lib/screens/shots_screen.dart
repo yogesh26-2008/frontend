@@ -1080,12 +1080,7 @@ class _BareIcon extends StatelessWidget {
       onTap: onTap, customBorder: const CircleBorder(),
       child: Padding(
         padding: const EdgeInsets.all(3),
-        child: DecoratedBox(
-          decoration: const BoxDecoration(
-            boxShadow: [BoxShadow(
-                color: Color(0x8C000000), blurRadius: 3, offset: Offset(0, 1))]),
-          child: Icon(icon, size: size, color: color),
-        ),
+        child: Icon(icon, size: size, color: color),
       ),
     ),
   );
@@ -1102,12 +1097,7 @@ class _BareCustomIcon extends StatelessWidget {
       onTap: onTap, customBorder: const CircleBorder(),
       child: Padding(
         padding: const EdgeInsets.all(3),
-        child: DecoratedBox(
-          decoration: const BoxDecoration(
-            boxShadow: [BoxShadow(
-                color: Color(0x8C000000), blurRadius: 3, offset: Offset(0, 1))]),
-          child: SizedBox(width: size, height: size, child: child),
-        ),
+        child: SizedBox(width: size, height: size, child: child),
       ),
     ),
   );
@@ -1151,12 +1141,7 @@ class _BareCustomIconWithCount extends StatelessWidget {
           onTap: onTap, customBorder: const CircleBorder(),
           child: Padding(
             padding: const EdgeInsets.all(3),
-            child: DecoratedBox(
-              decoration: const BoxDecoration(
-                boxShadow: [BoxShadow(
-                    color: Color(0x8C000000), blurRadius: 3, offset: Offset(0, 1))]),
-              child: SizedBox(width: size, height: size, child: child),
-            ),
+            child: SizedBox(width: size, height: size, child: child),
           ),
         ),
       ),

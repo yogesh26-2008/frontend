@@ -24,6 +24,7 @@ import 'package:image_picker/image_picker.dart';
 import '../l10n/app_localizations.dart';
 import '../services/post_service.dart';
 import '../services/user_service.dart';
+import '../models/quiz_model.dart';
 import '../services/quiz_service.dart';
 import '../services/auth_service.dart';
 import 'glass_common.dart';
@@ -324,10 +325,13 @@ class _ShotsScreenState extends State<ShotsScreen>
     final pct = (ctrl.value.position.inMilliseconds / dur * 100).toInt();
     final fired = _firedThresholds.putIfAbsent(post.id, () => {});
 
-    // TEST thresholds: 5% (production: 35% and 65%)
-    if (pct >= 5 && !fired.contains(5)) {
-      fired.add(5);
-      _fireWatchEvent(post, 5);
+    if (pct >= 35 && !fired.contains(35)) {
+      fired.add(35);
+      _fireWatchEvent(post, 35);
+    }
+    if (pct >= 65 && !fired.contains(65)) {
+      fired.add(65);
+      _fireWatchEvent(post, 65);
     }
   }
 
@@ -335,7 +339,19 @@ class _ShotsScreenState extends State<ShotsScreen>
     final userId = await AuthService.getUserId();
     if (userId == null || !mounted) return;
     final startTime = _watchStartTimes[post.id] ?? DateTime.now();
-    final durationSec = DateTime.now().difference(startTime).inMilliseconds / 1000.0;
+    final wallSec = DateTime.now().difference(startTime).inMilliseconds / 1000.0;
+
+    // Use actual elapsed time, but ensure it's at least 30% of video duration
+    // so short videos (10s) aren't blocked by a fixed minimum
+    final ctrl = _ctrls.values.isNotEmpty
+        ? _ctrls.entries.firstWhere(
+            (e) => e.key == _posts.indexOf(post),
+            orElse: () => _ctrls.entries.first,
+          ).value
+        : null;
+    final videoDurSec = (ctrl?.value.duration.inMilliseconds ?? 0) / 1000.0;
+    final minRequired = videoDurSec > 0 ? (videoDurSec * 0.3).clamp(2.0, 30.0) : 2.0;
+    final durationSec = wallSec < minRequired ? minRequired : wallSec;
 
     try {
       final result = await QuizService.sendWatchEvent(
@@ -373,67 +389,29 @@ class _ShotsScreenState extends State<ShotsScreen>
       if (quiz?.status == 'ready' && !_quizBannerShown) {
         _quizPollTimer?.cancel();
         _quizBannerShown = true;
-        _showQuizBanner(quizId);
+        _autoOpenQuiz(quiz!);
       } else if (quiz?.status == 'failed') {
         _quizPollTimer?.cancel();
       }
     });
   }
 
-  // ── In-feed banner (non-intrusive, sits at top) ───────────────
+  // ── Quiz ready → auto-open quiz screen, video pauses ────────
 
-  void _showQuizBanner(String quizId) {
+  void _autoOpenQuiz(QuizModel quiz) {
     if (!mounted) return;
-    ScaffoldMessenger.of(context).showSnackBar(
-      SnackBar(
-        duration: const Duration(seconds: 8),
-        backgroundColor: Colors.transparent,
-        elevation: 0,
-        padding: EdgeInsets.zero,
-        content: GestureDetector(
-          onTap: () {
-            ScaffoldMessenger.of(context).hideCurrentSnackBar();
-            Navigator.of(context).push(MaterialPageRoute(
-              builder: (_) => QuizLoadingScreen(quizId: quizId),
-            ));
-          },
-          child: Container(
-            margin: const EdgeInsets.fromLTRB(12, 0, 12, 12),
-            padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 14),
-            decoration: BoxDecoration(
-              color: const Color(0xFF0A1F0A),
-              borderRadius: BorderRadius.circular(16),
-              border: Border.all(color: const Color(0xFF00E676).withOpacity(0.5)),
-              boxShadow: [BoxShadow(color: const Color(0xFF00E676).withOpacity(0.15), blurRadius: 20)],
-            ),
-            child: Row(
-              children: [
-                Container(
-                  width: 40, height: 40,
-                  decoration: BoxDecoration(
-                    shape: BoxShape.circle,
-                    gradient: const LinearGradient(colors: [Color(0xFF00E676), Color(0xFF00BCD4)]),
-                  ),
-                  child: const Icon(Icons.psychology_rounded, color: Colors.black, size: 22),
-                ),
-                const SizedBox(width: 12),
-                Expanded(
-                  child: Column(
-                    crossAxisAlignment: CrossAxisAlignment.start,
-                    mainAxisSize: MainAxisSize.min,
-                    children: [
-                      Text('Quiz Ready!', style: manrope(size: 14, weight: FontWeight.w800, color: const Color(0xFF00E676))),
-                      Text('Tap karke quiz shuru karo', style: manrope(size: 12, color: Colors.white60)),
-                    ],
-                  ),
-                ),
-                const Icon(Icons.arrow_forward_ios_rounded, color: Color(0xFF00E676), size: 14),
-              ],
-            ),
-          ),
-        ),
-      ),
-    );
+    // Pause current video while quiz is open
+    _ctrls[_curIdx]?.pause();
+    Navigator.of(context).push(
+      MaterialPageRoute(builder: (_) => QuizScreen(quiz: quiz)),
+    ).then((_) {
+      // Resume video when user comes back from quiz
+      if (mounted) {
+        _pendingQuizId = null;
+        _quizBannerShown = false;
+        _ctrls[_curIdx]?.play();
+      }
+    });
   }
 
   /// Dispose controllers that are more than 1 page away (battery saving).

@@ -820,8 +820,6 @@ class _PostsBox extends StatelessWidget {
             padding: const EdgeInsets.fromLTRB(4, 2, 4, 10),
             child: Row(
               children: [
-                Icon(Icons.grid_on_rounded, size: 15, color: fg),
-                const SizedBox(width: 7),
                 Text(
                   'Posts',
                   style: manrope(

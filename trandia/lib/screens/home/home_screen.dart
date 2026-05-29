@@ -11,6 +11,8 @@ import 'package:visibility_detector/visibility_detector.dart';
 import '../../services/fcm_service.dart';
 import '../../services/chat_service.dart';
 import '../../services/auth_service.dart';
+import '../../services/user_service.dart';
+import '../../models/chat_model.dart';
 import '../call_screens.dart';
 import '../../services/post_service.dart';
 import '../../services/api_service.dart';
@@ -85,6 +87,8 @@ class _HomeScreenState extends State<HomeScreen>
   bool                  _loadingFeed    = false;
   bool                  _feedError      = false;
   bool                  _quickReelOpening = false;
+  bool                  _loadingSuggestions = false;
+  final List<UserProfile> _suggestedUsers = [];
   final Set<String>     _watchedLearnPostIds = <String>{};
   final ScrollController _scrollCtrl = ScrollController();
 
@@ -121,7 +125,11 @@ class _HomeScreenState extends State<HomeScreen>
       _loadUnreadNotifCount();
       ChatService().connectWebSocket();
       _listenForNewNotifications();
-      _loadMyUserId().then((_) => _listenForIncomingCalls());
+      _loadMyUserId().then((_) {
+        if (!mounted) return;
+        _listenForIncomingCalls();
+        _loadFollowerSuggestions();
+      });
       _loadFeed();
     });
   }
@@ -140,6 +148,52 @@ class _HomeScreenState extends State<HomeScreen>
   // ── Incoming call listener ─────────────────────────
   Future<void> _loadMyUserId() async {
     _myUserId = await AuthService.getCurrentUserId();
+  }
+
+  bool get _showSuggestionsTab =>
+      _suggestedUsers.isNotEmpty && _posts.length >= 3;
+
+  Future<void> _loadFollowerSuggestions() async {
+    if (_loadingSuggestions) return;
+    if (!mounted) return;
+    setState(() => _loadingSuggestions = true);
+    try {
+      final myId = _myUserId ?? await AuthService.getCurrentUserId();
+      if (myId == null || myId.isEmpty) return;
+
+      final myFollowers = await UserService.getFollowers(myId, limit: 8);
+      if (myFollowers.isEmpty) return;
+
+      final skipIds = <String>{
+        myId,
+        ...myFollowers.map((user) => user.id),
+      };
+      final followerLists = await Future.wait(
+        myFollowers.take(6).map(
+              (user) => UserService.getFollowers(user.id, limit: 5),
+            ),
+      );
+
+      final byId = <String, UserProfile>{};
+      for (final users in followerLists) {
+        for (final user in users) {
+          if (user.id.isEmpty || skipIds.contains(user.id)) continue;
+          if (user.username.isEmpty) continue;
+          byId.putIfAbsent(user.id, () => user);
+        }
+      }
+
+      if (!mounted) return;
+      setState(() {
+        _suggestedUsers
+          ..clear()
+          ..addAll(byId.values.take(10));
+      });
+    } catch (_) {
+      // Suggestions are optional; keep the feed unchanged if this fails.
+    } finally {
+      if (mounted) setState(() => _loadingSuggestions = false);
+    }
   }
 
   void _listenForIncomingCalls() {
@@ -551,7 +605,7 @@ class _HomeScreenState extends State<HomeScreen>
               padding: EdgeInsets.only(top: topPad + 56),
               itemCount: _posts.isEmpty
                   ? 2
-                  : _posts.length + 2,
+                  : _posts.length + 2 + (_showSuggestionsTab ? 1 : 0),
               itemBuilder: (ctx, i) {
                 if (i == 0) return _StorySection(isDark: isDark);
                 if (i == 1 && _posts.isEmpty) {
@@ -585,10 +639,16 @@ class _HomeScreenState extends State<HomeScreen>
                         color: (isDark ? Colors.white : Colors.black)
                             .withOpacity(0.38),
                         fontSize: 14,
-                      ))),
+                    ))),
                   );
                 }
-                final postIdx = i - 1;
+                if (_showSuggestionsTab && i == 4) {
+                  return _FollowerSuggestionsTab(
+                    isDark: isDark,
+                    users: _suggestedUsers,
+                  );
+                }
+                final postIdx = i - 1 - (_showSuggestionsTab && i > 4 ? 1 : 0);
                 if (postIdx == _posts.length) {
                   return Padding(
                     padding: const EdgeInsets.only(bottom: 130, top: 16),
@@ -2052,6 +2112,272 @@ class _StoryRingPainter extends CustomPainter {
 // ═════════════════════════════════════════════════════
 //  POST CARD
 // ═════════════════════════════════════════════════════
+class _FollowerSuggestionsTab extends StatefulWidget {
+  final bool isDark;
+  final List<UserProfile> users;
+
+  const _FollowerSuggestionsTab({
+    required this.isDark,
+    required this.users,
+  });
+
+  @override
+  State<_FollowerSuggestionsTab> createState() => _FollowerSuggestionsTabState();
+}
+
+class _FollowerSuggestionsTabState extends State<_FollowerSuggestionsTab> {
+  final Set<String> _followingIds = <String>{};
+  final Set<String> _busyIds = <String>{};
+
+  @override
+  void initState() {
+    super.initState();
+    _syncFollowing();
+  }
+
+  @override
+  void didUpdateWidget(covariant _FollowerSuggestionsTab oldWidget) {
+    super.didUpdateWidget(oldWidget);
+    _syncFollowing();
+  }
+
+  void _syncFollowing() {
+    for (final user in widget.users) {
+      if (user.isFollowing) _followingIds.add(user.id);
+    }
+  }
+
+  Color _avatarColor(String seed) {
+    final colors = [
+      const Color(0xFF646464),
+      const Color(0xFF744A40),
+      const Color(0xFF2D3561),
+      const Color(0xFF1B4332),
+      const Color(0xFF4A3F6B),
+    ];
+    return colors[seed.hashCode.abs() % colors.length];
+  }
+
+  String _initial(UserProfile user) {
+    final source = user.name.trim().isNotEmpty ? user.name.trim() : user.username.trim();
+    return source.isNotEmpty ? source[0].toUpperCase() : '?';
+  }
+
+  void _openProfile(UserProfile user) {
+    HapticFeedback.selectionClick();
+    Navigator.of(context).push(MaterialPageRoute(
+      builder: (_) => user_profile.ProfileScreen(
+        userId: user.id,
+        username: user.username,
+        displayName: user.name.isNotEmpty ? user.name : user.username,
+        handle: user.username,
+        initialFollowing: _followingIds.contains(user.id),
+      ),
+    ));
+  }
+
+  Future<void> _toggleFollow(UserProfile user) async {
+    if (_busyIds.contains(user.id)) return;
+    HapticFeedback.lightImpact();
+    final wasFollowing = _followingIds.contains(user.id);
+    setState(() {
+      _busyIds.add(user.id);
+      if (wasFollowing) {
+        _followingIds.remove(user.id);
+      } else {
+        _followingIds.add(user.id);
+      }
+    });
+
+    final ok = wasFollowing
+        ? await UserService.unfollowUser(user.id)
+        : await UserService.followUser(user.id);
+
+    if (!mounted) return;
+    setState(() {
+      _busyIds.remove(user.id);
+      if (!ok) {
+        if (wasFollowing) {
+          _followingIds.add(user.id);
+        } else {
+          _followingIds.remove(user.id);
+        }
+      }
+    });
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final fg = widget.isDark ? Colors.white : Colors.black;
+    final border = fg.op(0.10);
+    final cardBg = widget.isDark ? const Color(0xFF121214) : Colors.white;
+
+    return Padding(
+      padding: const EdgeInsets.fromLTRB(10, 14, 0, 18),
+      child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
+        Padding(
+          padding: const EdgeInsets.only(right: 14),
+          child: Row(children: [
+            Text(
+              'TUMHARE LIYE SUGGESTION',
+              style: TextStyle(
+                color: fg.op(0.50),
+                fontSize: 12,
+                fontWeight: FontWeight.w800,
+                letterSpacing: 1.5,
+              ),
+            ),
+            const Spacer(),
+            Text(
+              'Sab Dekho',
+              style: TextStyle(
+                color: fg.op(0.92),
+                fontSize: 13,
+                fontWeight: FontWeight.w800,
+              ),
+            ),
+          ]),
+        ),
+        const SizedBox(height: 10),
+        SizedBox(
+          height: 184,
+          child: ListView.separated(
+            scrollDirection: Axis.horizontal,
+            physics: const BouncingScrollPhysics(),
+            itemCount: widget.users.length,
+            separatorBuilder: (_, __) => const SizedBox(width: 12),
+            itemBuilder: (_, index) {
+              final user = widget.users[index];
+              final isFollowing = _followingIds.contains(user.id);
+              final isBusy = _busyIds.contains(user.id);
+              return GestureDetector(
+                onTap: () => _openProfile(user),
+                child: Container(
+                  width: 150,
+                  padding: const EdgeInsets.fromLTRB(12, 12, 12, 10),
+                  decoration: BoxDecoration(
+                    borderRadius: BorderRadius.circular(18),
+                    border: Border.all(color: border, width: 0.8),
+                    gradient: LinearGradient(
+                      begin: Alignment.topCenter,
+                      end: Alignment.bottomCenter,
+                      colors: [
+                        fg.op(widget.isDark ? 0.08 : 0.04),
+                        cardBg,
+                      ],
+                    ),
+                    boxShadow: [
+                      BoxShadow(
+                        color: Colors.black.op(widget.isDark ? 0.22 : 0.08),
+                        blurRadius: 16,
+                        offset: const Offset(0, 8),
+                      ),
+                    ],
+                  ),
+                  child: Column(children: [
+                    Container(
+                      width: 64,
+                      height: 64,
+                      decoration: BoxDecoration(
+                        shape: BoxShape.circle,
+                        color: _avatarColor(user.id),
+                      ),
+                      child: ClipOval(
+                        child: user.picture != null && user.picture!.isNotEmpty
+                            ? CachedNetworkImage(
+                                imageUrl: user.picture!,
+                                fit: BoxFit.cover,
+                                errorWidget: (_, __, ___) => Center(
+                                  child: Text(
+                                    _initial(user),
+                                    style: const TextStyle(
+                                      color: Colors.white,
+                                      fontSize: 28,
+                                      fontWeight: FontWeight.w800,
+                                    ),
+                                  ),
+                                ),
+                              )
+                            : Center(
+                                child: Text(
+                                  _initial(user),
+                                  style: const TextStyle(
+                                    color: Colors.white,
+                                    fontSize: 28,
+                                    fontWeight: FontWeight.w800,
+                                  ),
+                                ),
+                              ),
+                      ),
+                    ),
+                    const SizedBox(height: 7),
+                    Text(
+                      user.username,
+                      maxLines: 1,
+                      overflow: TextOverflow.ellipsis,
+                      style: TextStyle(
+                        color: fg.op(0.92),
+                        fontSize: 15,
+                        fontWeight: FontWeight.w800,
+                      ),
+                    ),
+                    const SizedBox(height: 3),
+                    Text(
+                      isFollowing ? 'Followed by you' : 'Suggested',
+                      maxLines: 1,
+                      overflow: TextOverflow.ellipsis,
+                      style: TextStyle(
+                        color: fg.op(0.46),
+                        fontSize: 12,
+                        fontWeight: FontWeight.w600,
+                      ),
+                    ),
+                    const Spacer(),
+                    GestureDetector(
+                      onTap: isBusy ? null : () => _toggleFollow(user),
+                      child: Container(
+                        width: double.infinity,
+                        height: 34,
+                        alignment: Alignment.center,
+                        decoration: BoxDecoration(
+                          borderRadius: BorderRadius.circular(999),
+                          color: isFollowing ? fg.op(0.10) : fg,
+                          border: isFollowing
+                              ? Border.all(color: border, width: 0.8)
+                              : null,
+                        ),
+                        child: isBusy
+                            ? SizedBox(
+                                width: 15,
+                                height: 15,
+                                child: CircularProgressIndicator(
+                                  strokeWidth: 1.6,
+                                  color: isFollowing ? fg : cardBg,
+                                ),
+                              )
+                            : Text(
+                                isFollowing ? 'Following' : 'Follow Karo',
+                                maxLines: 1,
+                                overflow: TextOverflow.ellipsis,
+                                style: TextStyle(
+                                  color: isFollowing ? fg.op(0.88) : cardBg,
+                                  fontSize: 13,
+                                  fontWeight: FontWeight.w800,
+                                ),
+                              ),
+                      ),
+                    ),
+                  ]),
+                ),
+              );
+            },
+          ),
+        ),
+      ]),
+    );
+  }
+}
+
 class PostCard extends StatefulWidget {
   final PostModel   post;
   final bool        isDark;

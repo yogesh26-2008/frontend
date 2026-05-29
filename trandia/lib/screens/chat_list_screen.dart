@@ -12,20 +12,6 @@ import 'glass_common.dart';
 import 'chat_screen.dart';
 import 'search_screen.dart';
 
-class ActiveUser {
-  final String name;
-  final bool story;
-  const ActiveUser(this.name, this.story);
-}
-
-const _active = <ActiveUser>[
-  ActiveUser('mikhail', true),
-  ActiveUser('aanya_', false),
-  ActiveUser('devon.b', true),
-  ActiveUser('kiraa', false),
-  ActiveUser('ren.x', false),
-  ActiveUser('noor.j', true),
-];
 
 class ChatListScreen extends StatefulWidget {
   final bool dark;
@@ -307,32 +293,6 @@ class _ChatListScreenState extends State<ChatListScreen> with WidgetsBindingObse
 
               const SizedBox(height: 10),
 
-              // Favourites strip — only show in "all" tab
-              if (_activeFilter == 'all') ...[
-                Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
-                  Padding(
-                    padding: const EdgeInsets.fromLTRB(16, 0, 16, 6),
-                    child: Text('FAVOURITES'.tr(context),
-                        style: manrope(
-                            size: 11,
-                            weight: FontWeight.w700,
-                            color: sub,
-                            letterSpacing: 0.88)),
-                  ),
-                  SizedBox(
-                    height: 84,
-                    child: ListView.separated(
-                      scrollDirection: Axis.horizontal,
-                      padding: const EdgeInsets.symmetric(horizontal: 12),
-                      itemCount: _active.length,
-                      separatorBuilder: (_, __) => const SizedBox(width: 6),
-                      itemBuilder: (_, i) =>
-                          _ActiveAvatar(a: _active[i], i: i, dark: widget.dark),
-                    ),
-                  ),
-                ]),
-                const SizedBox(height: 5),
-              ],
 
               _buildPillRow(context, widget.dark),
               const SizedBox(height: 5),
@@ -529,79 +489,6 @@ class _ChatListScreenState extends State<ChatListScreen> with WidgetsBindingObse
   }
 }
 
-// ── Active Avatar ────────────────────────────────────────────
-
-class _ActiveAvatar extends StatelessWidget {
-  final ActiveUser a;
-  final int i;
-  final bool dark;
-  const _ActiveAvatar({required this.a, required this.i, required this.dark});
-
-  @override
-  Widget build(BuildContext context) {
-    final sub = GlassTokens.sub(dark);
-    return SizedBox(
-      width: 62,
-      child: Column(mainAxisAlignment: MainAxisAlignment.start, children: [
-        SizedBox(
-            width: 54,
-            height: 54,
-            child: Stack(clipBehavior: Clip.none, children: [
-              if (a.story)
-                Container(
-                  width: 54, height: 54,
-                  decoration: BoxDecoration(
-                    shape: BoxShape.circle,
-                    gradient: SweepGradient(
-                      startAngle: 3.49, endAngle: 9.77,
-                      colors: dark
-                          ? const [Colors.white, Color(0xFFAAAAAA), Color(0xFF555555), Colors.white]
-                          : const [Color(0xFF111111), Color(0xFF555555), Color(0xFFAAAAAA), Color(0xFF111111)],
-                    ),
-                  ),
-                  child: Padding(
-                    padding: const EdgeInsets.all(2),
-                    child: Container(
-                      decoration: BoxDecoration(
-                          shape: BoxShape.circle,
-                          color: dark ? const Color(0xFF0A0A0C) : const Color(0xFFFAFAFA)),
-                      padding: const EdgeInsets.all(2),
-                      child: _innerAvatar(),
-                    ),
-                  ),
-                )
-              else
-                _innerAvatar(),
-              Positioned(
-                right: 1, bottom: 1,
-                child: Container(
-                  width: 13, height: 13,
-                  decoration: BoxDecoration(
-                    shape: BoxShape.circle,
-                    color: Colors.green,
-                    border: Border.all(
-                        color: dark ? const Color(0xFF0A0A0C) : const Color(0xFFFAFAFA),
-                        width: 2.5),
-                  ),
-                ),
-              ),
-            ])),
-        const SizedBox(height: 5),
-        Text(a.name,
-            maxLines: 1,
-            overflow: TextOverflow.ellipsis,
-            style: manrope(size: 11, weight: FontWeight.w500, color: sub, letterSpacing: -0.05)),
-      ]),
-    );
-  }
-
-  Widget _innerAvatar() => Container(
-        decoration: BoxDecoration(shape: BoxShape.circle, gradient: monoAvatar(dark, i)),
-        alignment: Alignment.center,
-        child: Text(a.name[0].toUpperCase(),
-            style: manrope(size: 18, weight: FontWeight.w700, color: Colors.white, letterSpacing: -0.3)),
-      );
-}
 
 // ── Chat Row ─────────────────────────────────────────────────
 

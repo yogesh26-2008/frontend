@@ -27,7 +27,6 @@ import '../../services/story_service.dart';
 import '../comments_screen.dart';
 import '../liked_by_screen.dart';
 import '../../services/cryptography_service.dart';
-import '../../l10n/app_localizations.dart';
 import '../../utils/share_helper.dart';
 
 extension _ColorOp on Color {
@@ -2182,6 +2181,7 @@ class _PostCardState extends State<PostCard> {
                       dark: dark,
                       postUser: p.userName,
                       likeCount: p.likesCount,
+                      postId: p.id,
                     ),
                     transitionDuration: const Duration(milliseconds: 380),
                     reverseTransitionDuration: const Duration(milliseconds: 300),
@@ -3056,6 +3056,7 @@ class _InfinityBtnState extends State<_InfinityBtn>
             child: Container(width: _kBtnSize, height: _kBtnSize,
               decoration: BoxDecoration(shape: BoxShape.circle,
                 color: glass,
+                border: Border.all(color: border, width: 1),
                 boxShadow: [BoxShadow(color: Colors.black.op(0.22),
                     blurRadius: 12, offset: const Offset(0, 4))]),
               child: ClipOval(

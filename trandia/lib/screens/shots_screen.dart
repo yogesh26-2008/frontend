@@ -33,6 +33,7 @@ import 'create_post_screens.dart';
 import 'user_profile_screen.dart' as user_profile;
 import '../utils/share_helper.dart';
 import 'quiz_screen.dart';
+import '../main.dart' show appRouteObserver;
 
 // ───────────────────────────────────────────────────────────────
 // Models / helpers (kept compatible with existing UI widgets)
@@ -88,7 +89,8 @@ class ShotsScreen extends StatefulWidget {
 }
 
 class _ShotsScreenState extends State<ShotsScreen>
-    with TickerProviderStateMixin {
+    with TickerProviderStateMixin
+    implements RouteAware {
 
   // ── Feed state ────────────────────────────────────────────────
   ShotsFeed           _feed        = ShotsFeed.fun;
@@ -140,7 +142,32 @@ class _ShotsScreenState extends State<ShotsScreen>
   }
 
   @override
+  void didChangeDependencies() {
+    super.didChangeDependencies();
+    final route = ModalRoute.of(context);
+    if (route != null) appRouteObserver.subscribe(this, route);
+  }
+
+  // ── RouteAware — pause current video when another screen covers this one ──
+  @override
+  void didPushNext() => _ctrls[_curIdx]?.pause();
+
+  @override
+  void didPopNext() {
+    // Resume current video when returning from comments/profile etc.
+    if (!_muted) _ctrls[_curIdx]?.setVolume(1.0);
+    _ctrls[_curIdx]?.play();
+  }
+
+  @override
+  void didPush() {}
+
+  @override
+  void didPop() {}
+
+  @override
   void dispose() {
+    appRouteObserver.unsubscribe(this);
     _quizPollTimer?.cancel();
     _spin.dispose();
     _pageCtrl.dispose();

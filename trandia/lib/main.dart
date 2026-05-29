@@ -21,6 +21,11 @@ import 'utils/navigator_key.dart';
 
 export 'utils/navigator_key.dart' show navigatorKey;
 
+/// Global route observer — HomeScreen subscribes to detect when it's covered
+/// by a pushed route so it can pause all video players.
+final RouteObserver<ModalRoute<void>> appRouteObserver =
+    RouteObserver<ModalRoute<void>>();
+
 @pragma('vm:entry-point')
 Future<void> _bgMessageHandler(RemoteMessage message) async {
   await Firebase.initializeApp(options: DefaultFirebaseOptions.currentPlatform);
@@ -136,6 +141,7 @@ class _TrandiaAppState extends State<TrandiaApp> with WidgetsBindingObserver {
           debugShowCheckedModeBanner: false,
           title: 'Trandia',
           navigatorKey: navigatorKey,
+          navigatorObservers: [appRouteObserver],
           theme: ThemeData(
             brightness: Brightness.light,
             scaffoldBackgroundColor: const Color(0xFFFFFFFF),

@@ -104,6 +104,7 @@ class _ProfileScreenState extends State<ProfileScreen> {
   Future<void> _loadProfile() async {
     if (mounted) setState(() => _profileLoading = true);
     final p = await UserService.getUserProfile(widget.userId);
+    developer.log('_loadProfile: picture=${p?.picture}, name=${p?.name}');
     if (mounted) {
       if (p != null) {
         FollowState.set(widget.userId, p.isFollowing);

@@ -111,7 +111,7 @@ IconData _kindIcon(NfKind k) {
 const double _kCardHeight = 76;
 const double _kCardGap    = 10;
 const double _kListStartY = 112; // header(48) + 12 + chips(30) + 22 spacing
-const double _kIslandCollapseRange = 176;
+const double _kIslandCollapseRange = 80;
 const double _kIslandPinLift = 64; // keeps the folded stack above the bottom safe area
 
 class NotificationsScreen extends StatefulWidget {
@@ -661,9 +661,7 @@ class _DynamicIslandScrollCard extends StatelessWidget {
   static double _lerp(double a, double b, double t) => a + (b - a) * t;
 
   static double _islandCurve(double t) {
-    final eased = Curves.easeOutCubic.transform(t);
-    final settle = Curves.easeOutBack.transform((t - 0.18).clamp(0.0, 1.0));
-    return _lerp(eased, settle, 0.22).clamp(0.0, 1.0);
+    return Curves.easeOutCubic.transform(t);
   }
 }
 

@@ -14,6 +14,7 @@ import 'package:firebase_messaging/firebase_messaging.dart';
 import '../services/api_service.dart';
 import '../services/chat_service.dart';
 import '../services/user_service.dart';
+import '../services/follow_state.dart';
 import '../l10n/app_localizations.dart';
 import '../utils/error_dialog.dart';
 import 'glass_common.dart';
@@ -600,6 +601,25 @@ class _NfCardInner extends StatefulWidget {
 class _NfCardInnerState extends State<_NfCardInner> {
   bool _following = false;
   bool _followLoading = false;
+
+  @override
+  void initState() {
+    super.initState();
+    final userId = widget.n.fromUserId;
+    _following = FollowState.get(userId) ?? false;
+    FollowState.notifier.addListener(_onGlobalFollowChanged);
+  }
+
+  @override
+  void dispose() {
+    FollowState.notifier.removeListener(_onGlobalFollowChanged);
+    super.dispose();
+  }
+
+  void _onGlobalFollowChanged() {
+    final v = FollowState.get(widget.n.fromUserId);
+    if (v != null && mounted && v != _following) setState(() => _following = v);
+  }
 
   void _openProfile() {
     final n = widget.n;

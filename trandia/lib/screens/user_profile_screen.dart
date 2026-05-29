@@ -15,6 +15,7 @@ import 'package:flutter/services.dart';
 import 'package:font_awesome_flutter/font_awesome_flutter.dart';
 import 'package:url_launcher/url_launcher.dart';
 import '../services/user_service.dart';
+import '../services/follow_state.dart';
 import '../services/auth_service.dart';
 import '../services/chat_service.dart';
 import '../services/post_service.dart';
@@ -72,8 +73,9 @@ class _ProfileScreenState extends State<ProfileScreen> {
   @override
   void initState() {
     super.initState();
-    _isFollowing = widget.initialFollowing;
+    _isFollowing = FollowState.get(widget.userId) ?? widget.initialFollowing;
     _scrollCtrl.addListener(_onScroll);
+    FollowState.notifier.addListener(_onGlobalFollowChanged);
     if (widget.userId.isNotEmpty) {
       _loadProfile();
       _loadPosts(widget.userId);
@@ -82,8 +84,14 @@ class _ProfileScreenState extends State<ProfileScreen> {
 
   @override
   void dispose() {
+    FollowState.notifier.removeListener(_onGlobalFollowChanged);
     _scrollCtrl.dispose();
     super.dispose();
+  }
+
+  void _onGlobalFollowChanged() {
+    final v = FollowState.get(widget.userId);
+    if (v != null && mounted && v != _isFollowing) setState(() => _isFollowing = v);
   }
 
   void _onScroll() {
@@ -95,6 +103,7 @@ class _ProfileScreenState extends State<ProfileScreen> {
   Future<void> _loadProfile() async {
     final p = await UserService.getUserProfile(widget.userId);
     if (mounted && p != null) {
+      FollowState.set(widget.userId, p.isFollowing);
       setState(() {
         _profile = p;
         _isFollowing = p.isFollowing;

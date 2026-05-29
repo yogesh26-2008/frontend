@@ -1245,6 +1245,7 @@ class _RightRail extends StatelessWidget {
                 postDescription: data.caption,
                 postInitials:    initial,
                 postUserColor:   const Color(0xFF2D3561),
+                postId:          post.id,
               ),
               transitionDuration:        const Duration(milliseconds: 380),
               reverseTransitionDuration: const Duration(milliseconds: 300),

@@ -2416,6 +2416,8 @@ class _PostCardState extends State<PostCard> {
     HapticFeedback.selectionClick();
     Navigator.of(context).push(MaterialPageRoute(
       builder: (_) => user_profile.ProfileScreen(
+        userId: p.userId,
+        username: p.userUsername.isNotEmpty ? p.userUsername : p.userName,
         displayName: p.userName,
         handle: p.userUsername,
         initialFollowing: false,
@@ -2560,6 +2562,7 @@ class _PostCardState extends State<PostCard> {
                     postDescription: p.caption,
                     postInitials: _initials(p.userName),
                     postUserColor: avatarBg,
+                    postId: p.id,
                   ),
                   transitionDuration: const Duration(milliseconds: 380),
                   reverseTransitionDuration: const Duration(milliseconds: 300),

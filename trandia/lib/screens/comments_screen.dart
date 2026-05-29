@@ -13,6 +13,7 @@ class CommentsScreen extends StatefulWidget {
   final String postDescription;
   final String postInitials;
   final Color postUserColor;
+  final String? postId; // when provided, triggers real comment notification
 
   const CommentsScreen({
     super.key,
@@ -21,6 +22,7 @@ class CommentsScreen extends StatefulWidget {
     required this.postDescription,
     required this.postInitials,
     required this.postUserColor,
+    this.postId,
   });
 
   @override
@@ -204,6 +206,10 @@ class _CommentsScreenState extends State<CommentsScreen>
           myName,
           myInitials,
         );
+        // Notify post author via backend (fire-and-forget)
+        if (widget.postId != null && widget.postId!.isNotEmpty) {
+          UserService.notifyComment(widget.postId!, text);
+        }
 
         // Optimistic locally added comment
         final newComment = LocalComment(

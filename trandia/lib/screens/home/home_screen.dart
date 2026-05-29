@@ -54,6 +54,7 @@ class HomeScreen extends StatefulWidget {
 class _HomeScreenState extends State<HomeScreen>
     with TickerProviderStateMixin {
   bool _navOpen   = false;
+  bool _navHorizontal = false;
   int  _activeNav = 0;
   double? _swipeStartX;
   double? _swipeStartY;
@@ -283,8 +284,22 @@ class _HomeScreenState extends State<HomeScreen>
 
   void _toggleNav() {
     HapticFeedback.mediumImpact();
-    setState(() => _navOpen = !_navOpen);
+    final bool opening = !_navOpen;
+    setState(() {
+      _navOpen = opening;
+      if (opening) _navHorizontal = false;
+    });
     _navOpen ? _navCtrl.forward(from: 0) : _navCtrl.reverse();
+  }
+
+  void _openHorizontalNav() {
+    HapticFeedback.mediumImpact();
+    if (_navOpen && _navHorizontal) return;
+    setState(() {
+      _navOpen = true;
+      _navHorizontal = true;
+    });
+    _navCtrl.forward(from: 0);
   }
 
   void _openCreatePost(BuildContext context, bool isDark) async {
@@ -705,11 +720,13 @@ class _HomeScreenState extends State<HomeScreen>
 
           // Navbar
           Positioned(
-            bottom: 30 + _kBtnSize + _kNavGap, right: 20,
+            bottom: _navHorizontal ? 30 : 30 + _kBtnSize + _kNavGap,
+            right: _navHorizontal ? 20 + _kBtnSize + _kNavGap : 20,
             child: AnimatedBuilder(animation: _navCtrl,
               builder: (_, __) => IgnorePointer(ignoring: !_navOpen,
                 child: _StaggeredNavbar(
                   isDark: isDark, activeIndex: _activeNav,
+                  isHorizontal: _navHorizontal,
                   itemScales: _itemScales, itemOpacities: _itemOpacities,
                   onTap: (i) {
                     setState(() => _activeNav = i);
@@ -725,6 +742,7 @@ class _HomeScreenState extends State<HomeScreen>
               isDark: isDark,
               isOpen: _navOpen,
               onTap: _toggleNav,
+              onLongPress: _openHorizontalNav,
               onDoubleTap: () => _openQuickReel(isDark),
             )),
         ])),
@@ -2798,17 +2816,20 @@ class _SaveCirclePainter extends CustomPainter {
 // ═════════════════════════════════════════════════════
 class _StaggeredNavbar extends StatelessWidget {
   final bool isDark;
+  final bool isHorizontal;
   final int  activeIndex;
   final List<Animation<double>> itemScales, itemOpacities;
   final ValueChanged<int> onTap;
   const _StaggeredNavbar({
     required this.isDark, required this.activeIndex,
+    required this.isHorizontal,
     required this.itemScales, required this.itemOpacities,
     required this.onTap,
   });
   @override
   Widget build(BuildContext context) {
-    final double navH   = 5 * _kItemH + 24.0;
+    final double navW   = isHorizontal ? 5 * _kItemH + 24.0 : _kNavWidth;
+    final double navH   = isHorizontal ? _kNavWidth : 5 * _kItemH + 24.0;
     final Color  glass  = (isDark ? Colors.white : Colors.black).op(0.09);
     final Color  border = (isDark ? Colors.white : Colors.black).op(0.16);
     return FadeTransition(
@@ -2817,8 +2838,10 @@ class _StaggeredNavbar extends StatelessWidget {
         borderRadius: BorderRadius.circular(_kNavWidth / 2),
         child: BackdropFilter(
           filter: ui.ImageFilter.blur(sigmaX: 28, sigmaY: 28),
-          child: Container(
-            width: _kNavWidth, height: navH,
+          child: AnimatedContainer(
+            duration: Duration.zero,
+            curve: Curves.easeOutCubic,
+            width: navW, height: navH,
             decoration: BoxDecoration(
               color: glass,
               borderRadius: BorderRadius.circular(_kNavWidth / 2),
@@ -2827,8 +2850,11 @@ class _StaggeredNavbar extends StatelessWidget {
                   color: Colors.black.op(isDark ? 0.35 : 0.10),
                   blurRadius: 20, offset: const Offset(0, 6))]),
             child: Padding(
-              padding: const EdgeInsets.symmetric(vertical: 6),
-              child: Column(
+              padding: isHorizontal
+                  ? const EdgeInsets.symmetric(horizontal: 12)
+                  : const EdgeInsets.symmetric(vertical: 6),
+              child: Flex(
+                direction: isHorizontal ? Axis.horizontal : Axis.vertical,
                 mainAxisAlignment: MainAxisAlignment.spaceEvenly,
                 children: List.generate(5, (i) {
                   final bool active = activeIndex == i;
@@ -2837,7 +2863,9 @@ class _StaggeredNavbar extends StatelessWidget {
                       child: GestureDetector(
                         onTap: () { HapticFeedback.selectionClick(); onTap(i); },
                         behavior: HitTestBehavior.opaque,
-                        child: SizedBox(width: _kNavWidth, height: _kItemH,
+                        child: SizedBox(
+                          width: isHorizontal ? _kItemH : _kNavWidth,
+                          height: isHorizontal ? _kNavWidth : _kItemH,
                           child: Center(child: AnimatedContainer(
                             duration: const Duration(milliseconds: 220),
                             curve: Curves.easeOutCubic,
@@ -3016,11 +3044,13 @@ class _NavIconPainter extends CustomPainter {
 class _InfinityBtn extends StatefulWidget {
   final bool isDark, isOpen;
   final VoidCallback onTap;
+  final VoidCallback onLongPress;
   final VoidCallback onDoubleTap;
   const _InfinityBtn({
     required this.isDark,
     required this.isOpen,
     required this.onTap,
+    required this.onLongPress,
     required this.onDoubleTap,
   });
   @override
@@ -3050,6 +3080,8 @@ class _InfinityBtnState extends State<_InfinityBtn>
           onTapUp:     (_) => _ctrl.reverse(),
           onTapCancel: () => _ctrl.reverse(),
           onTap: widget.onTap,
+          onLongPress: widget.onLongPress,
+          onLongPressEnd: (_) => _ctrl.reverse(),
           onDoubleTap: widget.onDoubleTap,
           child: ClipOval(child: BackdropFilter(
             filter: ui.ImageFilter.blur(sigmaX: 20, sigmaY: 20),
@@ -3219,75 +3251,6 @@ class _IslandNotificationOverlayState
             ? (1.0 - (_dragY / (dismissThreshold * 2.0)).clamp(0.0, 0.5))
             : 1.0;
 
-<<<<<<< HEAD
-        return Positioned(
-          left  : left,
-          top   : top,
-          width : right - left,
-          height: bottom - top,
-          child : PopScope(
-            canPop: false,
-            onPopInvokedWithResult: (didPop, _) {
-              if (!didPop) {
-                widget.onClose();
-              }
-            },
-            child: Opacity(
-            opacity: dragAlpha,
-            child: ClipRRect(
-              borderRadius: BorderRadius.circular(borderR),
-              child: BackdropFilter(
-                filter: ui.ImageFilter.blur(sigmaX: 24, sigmaY: 24),
-                child: Container(
-                  decoration: BoxDecoration(
-                    color: widget.isDark
-                        ? Colors.black.withOpacity(0.92)
-                        : Colors.white.withOpacity(0.94),
-                    borderRadius: BorderRadius.circular(borderR),
-                  ),
-                  child: GestureDetector(
-                    onVerticalDragStart: (_) {
-                      setState(() { _dragging = true; _dragY = 0; });
-                    },
-                    onVerticalDragUpdate: (d) {
-                      if (d.delta.dy > 0) {
-                        setState(() => _dragY += d.delta.dy);
-                      }
-                    },
-                    onVerticalDragEnd: (d) {
-                      if (_dragY > dismissThreshold ||
-                          (d.velocity.pixelsPerSecond.dy > 600)) {
-                        setState(() { _dragging = false; _dragY = 0; });
-                        widget.onClose();
-                      } else {
-                        setState(() { _dragging = false; _dragY = 0; });
-                      }
-                    },
-                    child: Stack(children: [
-                      Opacity(
-                        opacity: contentAlpha,
-                        child: NotificationsScreen(dark: widget.isDark, onClose: widget.onClose),
-                      ),
-
-                      if (contentAlpha > 0.1)
-                        Positioned(
-                          top: topPad + 6, left: 0, right: 0,
-                          child: Opacity(
-                            opacity: contentAlpha,
-                            child: Center(
-                              child: Container(
-                                width : 36, height: 4,
-                                decoration: BoxDecoration(
-                                  color: (widget.isDark
-                                      ? Colors.white
-                                      : Colors.black).withOpacity(0.22),
-                                  borderRadius: BorderRadius.circular(2)),
-                              ),
-                            ),
-                          ),
-                        ),
-                    ]),
-=======
         return Stack(
           children: [
             Positioned.fill(
@@ -3297,97 +3260,100 @@ class _IslandNotificationOverlayState
                   child: ColoredBox(
                     color: (widget.isDark ? Colors.black : Colors.white)
                         .withOpacity(bgDim),
->>>>>>> 25570231acd28216786dad7bbfc6b610d735b7e7
                   ),
                 ),
               ),
             ),
-<<<<<<< HEAD
-            ),
-          ),
-=======
             Positioned(
               left: left,
               top: top,
               width: right - left,
               height: bottom - top,
-              child: Opacity(
-                opacity: dragAlpha,
-                child: ClipRRect(
-                  borderRadius: BorderRadius.circular(borderR),
-                  child: BackdropFilter(
-                    filter: ui.ImageFilter.blur(
-                      sigmaX: ui.lerpDouble(18, 26, fillT)!,
-                      sigmaY: ui.lerpDouble(18, 26, fillT)!,
-                    ),
-                    child: Container(
-                      decoration: BoxDecoration(
-                        color: widget.isDark
-                            ? Colors.black.withOpacity(panelAlpha)
-                            : Colors.white.withOpacity(panelAlpha),
-                        borderRadius: BorderRadius.circular(borderR),
+              child: PopScope(
+                canPop: false,
+                onPopInvokedWithResult: (didPop, _) {
+                  if (!didPop) {
+                    widget.onClose();
+                  }
+                },
+                child: Opacity(
+                  opacity: dragAlpha,
+                  child: ClipRRect(
+                    borderRadius: BorderRadius.circular(borderR),
+                    child: BackdropFilter(
+                      filter: ui.ImageFilter.blur(
+                        sigmaX: ui.lerpDouble(18, 26, fillT)!,
+                        sigmaY: ui.lerpDouble(18, 26, fillT)!,
                       ),
-                      child: GestureDetector(
-                        onVerticalDragStart: (_) {
-                          setState(() {
-                            _dragging = true;
-                            _dragY = 0;
-                          });
-                        },
-                        onVerticalDragUpdate: (d) {
-                          if (d.delta.dy > 0) {
-                            setState(() => _dragY += d.delta.dy);
-                          }
-                        },
-                        onVerticalDragEnd: (d) {
-                          if (_dragY > dismissThreshold ||
-                              (d.velocity.pixelsPerSecond.dy > 600)) {
+                      child: Container(
+                        decoration: BoxDecoration(
+                          color: widget.isDark
+                              ? Colors.black.withOpacity(panelAlpha)
+                              : Colors.white.withOpacity(panelAlpha),
+                          borderRadius: BorderRadius.circular(borderR),
+                        ),
+                        child: GestureDetector(
+                          onVerticalDragStart: (_) {
                             setState(() {
-                              _dragging = false;
+                              _dragging = true;
                               _dragY = 0;
                             });
-                            widget.onClose();
-                          } else {
-                            setState(() {
-                              _dragging = false;
-                              _dragY = 0;
-                            });
-                          }
-                        },
-                        child: Stack(children: [
-                          Transform.translate(
-                            offset: Offset(0, contentLift),
-                            child: Opacity(
-                              opacity: contentAlpha,
-                              child: NotificationsScreen(
-                                dark: widget.isDark,
-                                onClose: widget.onClose,
-                                backgroundOpacity: fillT,
-                              ),
-                            ),
-                          ),
-
-                          if (contentAlpha > 0.1)
-                            Positioned(
-                              top: topPad + 6, left: 0, right: 0,
+                          },
+                          onVerticalDragUpdate: (d) {
+                            if (d.delta.dy > 0) {
+                              setState(() => _dragY += d.delta.dy);
+                            }
+                          },
+                          onVerticalDragEnd: (d) {
+                            if (_dragY > dismissThreshold ||
+                                (d.velocity.pixelsPerSecond.dy > 600)) {
+                              setState(() {
+                                _dragging = false;
+                                _dragY = 0;
+                              });
+                              widget.onClose();
+                            } else {
+                              setState(() {
+                                _dragging = false;
+                                _dragY = 0;
+                              });
+                            }
+                          },
+                          child: Stack(children: [
+                            Transform.translate(
+                              offset: Offset(0, contentLift),
                               child: Opacity(
                                 opacity: contentAlpha,
-                                child: Center(
-                                  child: Container(
-                                    width: 36,
-                                    height: 4,
-                                    decoration: BoxDecoration(
-                                      color: (widget.isDark
-                                              ? Colors.white
-                                              : Colors.black)
-                                          .withOpacity(0.22),
-                                      borderRadius: BorderRadius.circular(2),
+                                child: NotificationsScreen(
+                                  dark: widget.isDark,
+                                  onClose: widget.onClose,
+                                  backgroundOpacity: fillT,
+                                ),
+                              ),
+                            ),
+
+                            if (contentAlpha > 0.1)
+                              Positioned(
+                                top: topPad + 6, left: 0, right: 0,
+                                child: Opacity(
+                                  opacity: contentAlpha,
+                                  child: Center(
+                                    child: Container(
+                                      width: 36,
+                                      height: 4,
+                                      decoration: BoxDecoration(
+                                        color: (widget.isDark
+                                                ? Colors.white
+                                                : Colors.black)
+                                            .withOpacity(0.22),
+                                        borderRadius: BorderRadius.circular(2),
+                                      ),
                                     ),
                                   ),
                                 ),
                               ),
-                            ),
-                        ]),
+                          ]),
+                        ),
                       ),
                     ),
                   ),
@@ -3395,7 +3361,6 @@ class _IslandNotificationOverlayState
               ),
             ),
           ],
->>>>>>> 25570231acd28216786dad7bbfc6b610d735b7e7
         );
       },
     );

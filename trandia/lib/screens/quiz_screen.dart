@@ -7,7 +7,7 @@ import '../services/quiz_service.dart';
 import 'glass_common.dart';
 
 // ─────────────────────────────────────────────────────────────────────────────
-// Entry point — shows loading state while quiz fetches, then starts quiz
+// Entry point — polls until quiz is ready, then launches QuizScreen
 // ─────────────────────────────────────────────────────────────────────────────
 
 class QuizLoadingScreen extends StatefulWidget {
@@ -29,7 +29,8 @@ class _QuizLoadingScreenState extends State<QuizLoadingScreen>
     super.initState();
     _pulse = AnimationController(vsync: this, duration: const Duration(milliseconds: 1200))
       ..repeat(reverse: true);
-    _startPolling();
+    _poll();
+    _pollTimer = Timer.periodic(const Duration(seconds: 4), (_) => _poll());
   }
 
   @override
@@ -37,11 +38,6 @@ class _QuizLoadingScreenState extends State<QuizLoadingScreen>
     _pulse.dispose();
     _pollTimer?.cancel();
     super.dispose();
-  }
-
-  void _startPolling() {
-    _poll();
-    _pollTimer = Timer.periodic(const Duration(seconds: 4), (_) => _poll());
   }
 
   Future<void> _poll() async {
@@ -122,8 +118,10 @@ class _QuizLoadingScreenState extends State<QuizLoadingScreen>
 }
 
 // ─────────────────────────────────────────────────────────────────────────────
-// Main Quiz Screen
+// Main Quiz Screen — 5 questions, 30s timer, skip button
 // ─────────────────────────────────────────────────────────────────────────────
+
+const int _kTimerSeconds = 30;
 
 class QuizScreen extends StatefulWidget {
   final QuizModel quiz;
@@ -142,8 +140,13 @@ class _QuizScreenState extends State<QuizScreen> with TickerProviderStateMixin {
   bool _submitting = false;
   QuizSubmitResult? _result;
 
+  // Slide transition controller
   late AnimationController _slideCtrl;
   late Animation<Offset> _slideAnim;
+
+  // 30-second countdown
+  Timer? _countdownTimer;
+  int _secondsLeft = _kTimerSeconds;
 
   @override
   void initState() {
@@ -153,18 +156,48 @@ class _QuizScreenState extends State<QuizScreen> with TickerProviderStateMixin {
     _slideAnim = Tween<Offset>(begin: const Offset(0.08, 0), end: Offset.zero)
         .animate(CurvedAnimation(parent: _slideCtrl, curve: Curves.easeOut));
     _slideCtrl.forward();
+    _startTimer();
   }
 
   @override
   void dispose() {
+    _countdownTimer?.cancel();
     _slideCtrl.dispose();
     super.dispose();
   }
 
-  QuizQuestion get _current => widget.quiz.questions[_currentIndex];
+  // ── Timer ──────────────────────────────────────────────────────
+
+  void _startTimer() {
+    _countdownTimer?.cancel();
+    setState(() => _secondsLeft = _kTimerSeconds);
+    _countdownTimer = Timer.periodic(const Duration(seconds: 1), (_) {
+      if (!mounted) return;
+      if (_answered) return;
+      setState(() => _secondsLeft--);
+      if (_secondsLeft <= 0) {
+        _countdownTimer?.cancel();
+        _autoAdvance();
+      }
+    });
+  }
+
+  void _autoAdvance() {
+    if (_answered) return;
+    HapticFeedback.heavyImpact();
+    final elapsed = DateTime.now().difference(_questionStartTime).inMilliseconds / 1000;
+    setState(() {
+      _timePerQuestion[_currentIndex] = elapsed;
+      _answered = true;
+      // selectedAnswer stays null — means "timed out / skipped"
+    });
+  }
+
+  // ── Answer selection ───────────────────────────────────────────
 
   void _selectAnswer(int idx) {
     if (_answered) return;
+    _countdownTimer?.cancel();
     HapticFeedback.selectionClick();
     final elapsed = DateTime.now().difference(_questionStartTime).inMilliseconds / 1000;
     setState(() {
@@ -174,21 +207,38 @@ class _QuizScreenState extends State<QuizScreen> with TickerProviderStateMixin {
     });
   }
 
+  void _skipQuestion() {
+    if (_answered) return;
+    _countdownTimer?.cancel();
+    HapticFeedback.selectionClick();
+    final elapsed = DateTime.now().difference(_questionStartTime).inMilliseconds / 1000;
+    setState(() {
+      _timePerQuestion[_currentIndex] = elapsed;
+      _answered = true;
+      // selectedAnswer stays null
+    });
+  }
+
+  // ── Navigation ─────────────────────────────────────────────────
+
   void _nextQuestion() {
     if (_currentIndex < 4) {
       _slideCtrl.reset();
       setState(() {
         _currentIndex++;
-        _answered = _selectedAnswers[_currentIndex] != null;
+        _answered = _selectedAnswers[_currentIndex] != null ||
+            (_timePerQuestion[_currentIndex] > 0);
         _questionStartTime = DateTime.now();
       });
       _slideCtrl.forward();
+      if (!_answered) _startTimer();
     } else {
       _submitQuiz();
     }
   }
 
   Future<void> _submitQuiz() async {
+    _countdownTimer?.cancel();
     setState(() => _submitting = true);
     final answers = _selectedAnswers.map((a) => a ?? 0).toList();
     final times = _timePerQuestion.map((t) => t < 8 ? 8.0 : t).toList();
@@ -201,23 +251,29 @@ class _QuizScreenState extends State<QuizScreen> with TickerProviderStateMixin {
     setState(() { _result = result; _submitting = false; });
   }
 
+  // ── Helpers ────────────────────────────────────────────────────
+
+  QuizQuestion get _current => widget.quiz.questions[_currentIndex];
+
   Color _diffColor(String d) {
     switch (d) {
-      case 'saral': return const Color(0xFF00E676);
+      case 'saral':   return const Color(0xFF00E676);
       case 'samanya': return const Color(0xFF40C4FF);
-      case 'kathin': return const Color(0xFFFF6B6B);
-      default: return Colors.white54;
+      case 'kathin':  return const Color(0xFFFF6B6B);
+      default:        return Colors.white54;
     }
   }
 
   String _diffLabel(String d) {
     switch (d) {
-      case 'saral': return 'Saral';
+      case 'saral':   return 'Saral';
       case 'samanya': return 'Samanya';
-      case 'kathin': return 'Kathin';
-      default: return d;
+      case 'kathin':  return 'Kathin';
+      default:        return d;
     }
   }
+
+  // ── Build ──────────────────────────────────────────────────────
 
   @override
   Widget build(BuildContext context) {
@@ -248,7 +304,7 @@ class _QuizScreenState extends State<QuizScreen> with TickerProviderStateMixin {
                 child: _buildQuestionCard(),
               ),
             ),
-            _buildNextButton(),
+            _buildBottomButtons(),
             const SizedBox(height: 16),
           ],
         ),
@@ -257,6 +313,12 @@ class _QuizScreenState extends State<QuizScreen> with TickerProviderStateMixin {
   }
 
   Widget _buildHeader() {
+    final timerColor = _secondsLeft > 10
+        ? const Color(0xFF00E676)
+        : _secondsLeft > 5
+            ? const Color(0xFFFFC107)
+            : const Color(0xFFFF6B6B);
+
     return Padding(
       padding: const EdgeInsets.fromLTRB(16, 12, 16, 4),
       child: Row(
@@ -278,6 +340,26 @@ class _QuizScreenState extends State<QuizScreen> with TickerProviderStateMixin {
             style: manrope(size: 14, weight: FontWeight.w700, color: Colors.white70),
           ),
           const SizedBox(width: 12),
+          // 30s countdown ring
+          SizedBox(
+            width: 40, height: 40,
+            child: Stack(
+              alignment: Alignment.center,
+              children: [
+                CircularProgressIndicator(
+                  value: _answered ? 1.0 : _secondsLeft / _kTimerSeconds,
+                  strokeWidth: 3,
+                  backgroundColor: Colors.white12,
+                  valueColor: AlwaysStoppedAnimation(_answered ? Colors.white24 : timerColor),
+                ),
+                Text(
+                  _answered ? '' : '$_secondsLeft',
+                  style: manrope(size: 11, weight: FontWeight.w800, color: timerColor),
+                ),
+              ],
+            ),
+          ),
+          const SizedBox(width: 10),
           Container(
             padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
             decoration: BoxDecoration(
@@ -301,9 +383,9 @@ class _QuizScreenState extends State<QuizScreen> with TickerProviderStateMixin {
       child: Row(
         children: List.generate(5, (i) {
           Color color;
-          if (i < _currentIndex) color = const Color(0xFF00E676);
+          if (i < _currentIndex)      color = const Color(0xFF00E676);
           else if (i == _currentIndex) color = const Color(0xFF00E676).withOpacity(0.5);
-          else color = Colors.white12;
+          else                         color = Colors.white12;
           return Expanded(
             child: Container(
               height: 3,
@@ -317,11 +399,31 @@ class _QuizScreenState extends State<QuizScreen> with TickerProviderStateMixin {
   }
 
   Widget _buildQuestionCard() {
+    final selected = _selectedAnswers[_currentIndex];
+    final timedOut = _answered && selected == null;
+
     return SingleChildScrollView(
       padding: const EdgeInsets.symmetric(horizontal: 16),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
+          // Timed-out banner
+          if (timedOut)
+            Container(
+              margin: const EdgeInsets.only(bottom: 12),
+              padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 10),
+              decoration: BoxDecoration(
+                color: const Color(0xFFFF6B6B).withOpacity(0.10),
+                borderRadius: BorderRadius.circular(12),
+                border: Border.all(color: const Color(0xFFFF6B6B).withOpacity(0.3)),
+              ),
+              child: Row(children: [
+                const Icon(Icons.timer_off_rounded, color: Color(0xFFFF6B6B), size: 16),
+                const SizedBox(width: 8),
+                Text('Time khatam! Sahi jawab dekho', style: manrope(size: 12, color: const Color(0xFFFF6B6B))),
+              ]),
+            ),
+          // Question bubble
           ClipRRect(
             borderRadius: BorderRadius.circular(20),
             child: BackdropFilter(
@@ -343,8 +445,8 @@ class _QuizScreenState extends State<QuizScreen> with TickerProviderStateMixin {
           ),
           const SizedBox(height: 16),
           ...List.generate(_current.options.length, (i) => _buildOption(i)),
-          if (_answered && _selectedAnswers[_currentIndex] != _current.correctAnswerIndex)
-            _buildExplanation(),
+          // Always show explanation after answering
+          if (_answered) _buildExplanation(),
         ],
       ),
     );
@@ -352,25 +454,25 @@ class _QuizScreenState extends State<QuizScreen> with TickerProviderStateMixin {
 
   Widget _buildOption(int i) {
     final selected = _selectedAnswers[_currentIndex] == i;
-    final correct = _current.correctAnswerIndex == i;
+    final correct  = _current.correctAnswerIndex == i;
     Color borderColor;
     Color bgColor;
     Widget? trailing;
 
     if (!_answered) {
       borderColor = Colors.white.withOpacity(0.12);
-      bgColor = Colors.white.withOpacity(0.05);
+      bgColor     = Colors.white.withOpacity(0.05);
     } else if (correct) {
       borderColor = const Color(0xFF00E676);
-      bgColor = const Color(0xFF00E676).withOpacity(0.12);
-      trailing = const Icon(Icons.check_circle_rounded, color: Color(0xFF00E676), size: 20);
+      bgColor     = const Color(0xFF00E676).withOpacity(0.12);
+      trailing    = const Icon(Icons.check_circle_rounded, color: Color(0xFF00E676), size: 20);
     } else if (selected) {
       borderColor = const Color(0xFFFF6B6B);
-      bgColor = const Color(0xFFFF6B6B).withOpacity(0.12);
-      trailing = const Icon(Icons.cancel_rounded, color: Color(0xFFFF6B6B), size: 20);
+      bgColor     = const Color(0xFFFF6B6B).withOpacity(0.12);
+      trailing    = const Icon(Icons.cancel_rounded, color: Color(0xFFFF6B6B), size: 20);
     } else {
       borderColor = Colors.white.withOpacity(0.06);
-      bgColor = Colors.transparent;
+      bgColor     = Colors.transparent;
     }
 
     return GestureDetector(
@@ -413,7 +515,7 @@ class _QuizScreenState extends State<QuizScreen> with TickerProviderStateMixin {
 
   Widget _buildExplanation() {
     return Container(
-      margin: const EdgeInsets.only(top: 8),
+      margin: const EdgeInsets.only(top: 4, bottom: 8),
       padding: const EdgeInsets.all(14),
       decoration: BoxDecoration(
         color: const Color(0xFF40C4FF).withOpacity(0.08),
@@ -436,34 +538,55 @@ class _QuizScreenState extends State<QuizScreen> with TickerProviderStateMixin {
     );
   }
 
-  Widget _buildNextButton() {
+  Widget _buildBottomButtons() {
     final isLast = _currentIndex == 4;
     return Padding(
       padding: const EdgeInsets.fromLTRB(16, 8, 16, 0),
-      child: GestureDetector(
-        onTap: _answered ? _nextQuestion : null,
-        child: AnimatedContainer(
-          duration: const Duration(milliseconds: 200),
-          width: double.infinity,
-          padding: const EdgeInsets.symmetric(vertical: 16),
-          decoration: BoxDecoration(
-            borderRadius: BorderRadius.circular(16),
-            gradient: _answered
-                ? const LinearGradient(colors: [Color(0xFF00E676), Color(0xFF00BCD4)])
-                : null,
-            color: _answered ? null : Colors.white12,
-          ),
-          child: Center(
-            child: Text(
-              isLast ? 'Submit Quiz' : 'Agla Sawaal',
-              style: manrope(
-                size: 15,
-                weight: FontWeight.w700,
-                color: _answered ? Colors.black : Colors.white38,
+      child: Row(
+        children: [
+          // Skip button — always visible, disabled once answered
+          if (!_answered)
+            GestureDetector(
+              onTap: _skipQuestion,
+              child: Container(
+                padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 16),
+                decoration: BoxDecoration(
+                  borderRadius: BorderRadius.circular(16),
+                  color: Colors.white.withOpacity(0.07),
+                  border: Border.all(color: Colors.white.withOpacity(0.12)),
+                ),
+                child: Text('Skip', style: manrope(size: 14, weight: FontWeight.w600, color: Colors.white54)),
+              ),
+            ),
+          if (!_answered) const SizedBox(width: 10),
+          Expanded(
+            child: GestureDetector(
+              onTap: _answered ? _nextQuestion : null,
+              child: AnimatedContainer(
+                duration: const Duration(milliseconds: 200),
+                width: double.infinity,
+                padding: const EdgeInsets.symmetric(vertical: 16),
+                decoration: BoxDecoration(
+                  borderRadius: BorderRadius.circular(16),
+                  gradient: _answered
+                      ? const LinearGradient(colors: [Color(0xFF00E676), Color(0xFF00BCD4)])
+                      : null,
+                  color: _answered ? null : Colors.white12,
+                ),
+                child: Center(
+                  child: Text(
+                    isLast ? 'Submit Quiz' : 'Agla Sawaal',
+                    style: manrope(
+                      size: 15,
+                      weight: FontWeight.w700,
+                      color: _answered ? Colors.black : Colors.white38,
+                    ),
+                  ),
+                ),
               ),
             ),
           ),
-        ),
+        ],
       ),
     );
   }
@@ -480,9 +603,9 @@ class _ResultScreen extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final pct = (result.score / result.total * 100).round();
+    final pct   = (result.score / result.total * 100).round();
     final emoji = pct >= 80 ? '🏆' : pct >= 60 ? '👍' : '📚';
-    final msg = pct >= 80 ? 'Shandaar!' : pct >= 60 ? 'Achha kiya!' : 'Aur practice karo!';
+    final msg   = pct >= 80 ? 'Shandaar!' : pct >= 60 ? 'Achha kiya!' : 'Aur practice karo!';
 
     return Scaffold(
       backgroundColor: Colors.black,
@@ -514,7 +637,6 @@ class _ResultScreen extends StatelessWidget {
                 ),
               ),
               const SizedBox(height: 28),
-              // Score circle
               SizedBox(
                 width: 130, height: 130,
                 child: Stack(
@@ -526,20 +648,16 @@ class _ResultScreen extends StatelessWidget {
                       backgroundColor: Colors.white12,
                       valueColor: const AlwaysStoppedAnimation(Color(0xFF00E676)),
                     ),
-                    Text(
-                      '$pct%',
-                      style: manrope(size: 28, weight: FontWeight.w800),
-                    ),
+                    Text('$pct%', style: manrope(size: 28, weight: FontWeight.w800)),
                   ],
                 ),
               ),
               const SizedBox(height: 32),
-              // Per-question review
               Expanded(
                 child: ListView.builder(
                   itemCount: quiz.questions.length,
                   itemBuilder: (_, i) {
-                    final q = quiz.questions[i];
+                    final q       = quiz.questions[i];
                     final correct = result.correctAnswers[i];
                     return Container(
                       margin: const EdgeInsets.only(bottom: 10),
@@ -579,7 +697,8 @@ class _ResultScreen extends StatelessWidget {
                     gradient: const LinearGradient(colors: [Color(0xFF00E676), Color(0xFF00BCD4)]),
                   ),
                   child: Center(
-                    child: Text('Wapas Jao', style: manrope(size: 15, weight: FontWeight.w700, color: Colors.black)),
+                    child: Text('Wapas Jao',
+                        style: manrope(size: 15, weight: FontWeight.w700, color: Colors.black)),
                   ),
                 ),
               ),

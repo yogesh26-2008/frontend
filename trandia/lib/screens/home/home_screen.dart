@@ -2561,7 +2561,21 @@ class _PostCardState extends State<PostCard> {
               ]),
             ),
             const Spacer(),
-            Text(p.timeAgo, style: TextStyle(color: textSub, fontSize: 11)),
+            GestureDetector(
+              onTap: () => HapticFeedback.lightImpact(),
+              child: Padding(
+                padding: const EdgeInsets.only(left: 8, right: 2),
+                child: Text(
+                  '\u22EF',
+                  style: TextStyle(
+                    color: textSub,
+                    fontSize: 24,
+                    fontWeight: FontWeight.w600,
+                    height: 1.0,
+                  ),
+                ),
+              ),
+            ),
           ])),
 
         // ── Media ────────────────────────────────────
@@ -2709,6 +2723,8 @@ class _PostCardState extends State<PostCard> {
                           fontWeight: FontWeight.w600)),
                         TextSpan(text: p.caption, style: TextStyle(
                           color: textPrimary.op(0.85), fontSize: 13, height: 1.45)),
+                        TextSpan(text: '  ${p.timeAgo}', style: TextStyle(
+                          color: textSub, fontSize: 11, height: 1.45)),
                       ]))
                     : Text.rich(TextSpan(children: [
                         TextSpan(text: '${p.userName} ', style: TextStyle(
@@ -2716,13 +2732,22 @@ class _PostCardState extends State<PostCard> {
                           fontWeight: FontWeight.w600)),
                         TextSpan(text: p.caption, style: TextStyle(
                           color: textPrimary.op(0.85), fontSize: 13, height: 1.45)),
+                        TextSpan(text: '  ${p.timeAgo}', style: TextStyle(
+                          color: textSub, fontSize: 11, height: 1.45)),
                       ]),
                       maxLines: 2,
                       overflow: TextOverflow.ellipsis,
                     ),
               ))),
 
-        if (p.caption.isEmpty) const SizedBox(height: 10),
+        if (p.caption.isEmpty)
+          Padding(
+            padding: const EdgeInsets.fromLTRB(10, 2, 10, 10),
+            child: Text(
+              p.timeAgo,
+              style: TextStyle(color: textSub, fontSize: 11),
+            ),
+          ),
       ]),
     );
   }
